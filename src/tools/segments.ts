@@ -1,14 +1,18 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import polyline from "@mapbox/polyline";
+import { buildGPX, BaseBuilder } from "gpx-builder";
 import { stravaGet, stravaPut } from "../strava-client.js";
 import { formatToolError } from "../errors.js";
-import { jsonResult } from "../format.js";
+import { jsonResult, textResult, formatDistance } from "../format.js";
 import { paginationSchema, formatPaginationNote } from "../pagination.js";
 import type {
   DetailedSegment,
   SegmentEffort,
   ExplorerSegment,
 } from "../types.js";
+
+const { Point, Segment, Track } = BaseBuilder.MODELS;
 
 export function register(server: McpServer): void {
   server.registerTool(
@@ -216,6 +220,60 @@ export function register(server: McpServer): void {
           { starred },
         );
         return jsonResult(segment);
+      } catch (error) {
+        return formatToolError(error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "strava_export_segment_gpx",
+    {
+      title: "Export Segment as GPX",
+      description:
+        "Export a Strava segment as a GPX file for navigation. Returns GPX XML that can be imported into Garmin Connect, Coros, or other GPS devices. Note: The Strava API does not support uploading routes, so the GPX must be imported manually into your device/app.",
+      inputSchema: {
+        segment_id: z.coerce.number().int().describe("The segment ID"),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({ segment_id }: { segment_id: number }) => {
+      try {
+        const segment = await stravaGet<DetailedSegment>(
+          `/segments/${segment_id}`,
+        );
+
+        const encoded =
+          segment.map.polyline ?? segment.map.summary_polyline;
+        if (!encoded) {
+          return textResult("No polyline data available for this segment.");
+        }
+
+        const coords = polyline.decode(encoded);
+        const points = coords.map(
+          ([lat, lon]: [number, number]) => new Point(lat, lon),
+        );
+
+        const desc = [
+          formatDistance(segment.distance),
+          `${Math.round(segment.total_elevation_gain)}m gain`,
+          `${segment.average_grade}% avg grade`,
+        ].join(" | ");
+
+        const gpxData = new BaseBuilder();
+        gpxData.setTracks([
+          new Track(
+            [new Segment(points)],
+            { name: segment.name, desc },
+          ),
+        ]);
+
+        return textResult(buildGPX(gpxData.toObject()));
       } catch (error) {
         return formatToolError(error);
       }
