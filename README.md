@@ -1,6 +1,6 @@
 # Strava MCP Server
 
-An MCP (Model Context Protocol) server that provides tools for interacting with the [Strava API v3](https://developers.strava.com/docs/reference/). Built with TypeScript and the [MCP SDK](https://modelcontextprotocol.io/).
+An MCP (Model Context Protocol) server for the [Strava API v3](https://developers.strava.com/docs/reference/). Exposes Strava data through MCP tools, resources, and prompts. Built with TypeScript and the [MCP SDK](https://modelcontextprotocol.io/).
 
 ## Tools
 
@@ -51,6 +51,37 @@ An MCP (Model Context Protocol) server that provides tools for interacting with 
 ### Uploads
 - **strava_create_upload** - Upload a FIT/TCX/GPX file to create an activity
 - **strava_get_upload** - Check upload processing status
+
+## Resources
+
+Resources provide read-only context data that clients can pull into conversations.
+
+### Static Resources
+
+| URI | Description |
+|---|---|
+| `strava://athlete/profile` | Current authenticated athlete profile (name, location, bikes, shoes) |
+| `strava://athlete/stats` | Year-to-date and all-time activity totals for runs, rides, and swims |
+
+### Template Resources
+
+| URI Template | Description |
+|---|---|
+| `strava://activity/{activityId}` | Detailed activity by ID |
+| `strava://segment/{segmentId}` | Detailed segment by ID |
+| `strava://route/{routeId}/gpx` | Export a route as GPX |
+
+## Prompts
+
+Prompts are user-triggered prompt templates that fetch relevant Strava data and ask the LLM for analysis.
+
+| Prompt | Arguments | Description |
+|---|---|---|
+| `weekly-summary` | `week_start?` (ISO date) | Summarize training for a given week |
+| `activity-analysis` | `activity_id` (required) | Deep analysis of pacing, effort, and performance for a single activity |
+| `training-plan-review` | `days?` (default 30) | Review training load, volume progression, and overtraining risk |
+| `segment-comparison` | `segment_id` (required) | Compare all efforts on a segment to identify trends |
+| `race-readiness` | `distance?` (e.g. "marathon") | Assess fitness and race readiness based on recent training |
 
 ## Setup
 

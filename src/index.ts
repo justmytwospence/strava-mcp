@@ -12,6 +12,17 @@ import { register as registerSegments } from "./tools/segments.js";
 import { register as registerStreams } from "./tools/streams.js";
 import { register as registerUploads } from "./tools/uploads.js";
 
+import { register as registerAthleteResources } from "./resources/athlete.js";
+import { register as registerActivityResources } from "./resources/activities.js";
+import { register as registerSegmentResources } from "./resources/segments.js";
+import { register as registerRouteResources } from "./resources/routes.js";
+
+import { register as registerWeeklySummary } from "./prompts/weekly-summary.js";
+import { register as registerActivityAnalysis } from "./prompts/activity-analysis.js";
+import { register as registerTrainingPlanReview } from "./prompts/training-plan-review.js";
+import { register as registerSegmentComparison } from "./prompts/segment-comparison.js";
+import { register as registerRaceReadiness } from "./prompts/race-readiness.js";
+
 function validateEnv(): void {
   const required = ["STRAVA_CLIENT_ID", "STRAVA_CLIENT_SECRET"];
   const missing = required.filter((key) => !process.env[key]);
@@ -50,6 +61,17 @@ async function main(): Promise<void> {
   registerSegments(server);
   registerStreams(server);
   registerUploads(server);
+
+  registerAthleteResources(server);
+  registerActivityResources(server);
+  registerSegmentResources(server);
+  registerRouteResources(server);
+
+  registerWeeklySummary(server);
+  registerActivityAnalysis(server);
+  registerTrainingPlanReview(server);
+  registerSegmentComparison(server);
+  registerRaceReadiness(server);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
