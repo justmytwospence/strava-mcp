@@ -1,0 +1,24 @@
+# Self-host strava-mcp: `cp .env.example .env`, fill it in, `docker compose up -d`.
+# The MCP endpoint is then http://<host>:8000/mcp (Streamable HTTP).
+services:
+  strava-mcp:
+    image: ghcr.io/justmytwospence/strava-mcp:2
+    restart: unless-stopped
+    environment:
+      STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID:?set STRAVA_CLIENT_ID in .env}
+      STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET:?set STRAVA_CLIENT_SECRET in .env}
+      STRAVA_REFRESH_TOKEN: ${STRAVA_REFRESH_TOKEN:?set STRAVA_REFRESH_TOKEN in .env}
+      STRAVA_ACCESS_TOKEN: ${STRAVA_ACCESS_TOKEN:-}
+      STRAVA_UNITS: ${STRAVA_UNITS:-}
+      # Hostnames clients use to reach the server, e.g. behind a reverse proxy.
+      # Requests naming any other Host are refused (DNS-rebinding protection).
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-}
+      # Rotated tokens are kept here so a restart never needs a fresh OAuth flow.
+      STRAVA_TOKEN_FILE: /data/tokens.json
+    volumes:
+      - strava-data:/data
+    ports:
+      - "8000:8000"
+
+volumes:
+  strava-data:

@@ -108,7 +108,35 @@ export STRAVA_REFRESH_TOKEN="your_refresh_token"
 
 Optionally set `STRAVA_UNITS` to `metric` or `imperial` to control how distances, paces, and elevations are formatted in prompts. If unset, the server uses the athlete's Strava measurement preference, falling back to metric.
 
-### 4. Add to Claude Desktop
+### 4. Run it as a service (Docker)
+
+```sh
+cp .env.example .env   # fill in the STRAVA_* values
+docker compose up -d
+```
+
+The server speaks [Streamable HTTP](https://modelcontextprotocol.io/specification/2026-07-28)
+at `http://<host>:8000/mcp` (also at `/`), with a health check at `/health`, and serves both
+2026-07-28 and older session-based clients:
+
+```json
+{ "mcpServers": { "strava": { "type": "http", "url": "http://localhost:8000/mcp" } } }
+```
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `STRAVA_CLIENT_ID`, `STRAVA_CLIENT_SECRET` | (required) | Your Strava API application |
+| `STRAVA_REFRESH_TOKEN` / `STRAVA_ACCESS_TOKEN` | (one required) | OAuth tokens; access tokens are refreshed automatically |
+| `STRAVA_TOKEN_FILE` | (unset; `/data/tokens.json` in compose) | Where rotated tokens are persisted, so a restart never needs a new OAuth flow |
+| `STRAVA_UNITS` | athlete preference | `metric` or `imperial` |
+| `MCP_TRANSPORT` | `stdio` (`http` in the image) | `stdio` or `http` |
+| `PORT` | `8000` | HTTP port |
+| `MCP_ALLOWED_HOSTS` | (any) | Comma-separated hostnames allowed in the `Host` header (set it behind a reverse proxy) |
+
+Images: `ghcr.io/justmytwospence/strava-mcp`, published for amd64 and arm64 by pushing a
+`vX.Y.Z` tag.
+
+### 5. Or run it over stdio (Claude Desktop)
 
 Add to your `claude_desktop_config.json`:
 
