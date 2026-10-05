@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { stravaGet } from "../strava-client.js";
 import { formatToolError } from "../errors.js";
@@ -18,9 +18,9 @@ export function register(server: McpServer): void {
       title: "List Athlete Clubs",
       description:
         "List clubs the authenticated athlete belongs to.",
-      inputSchema: {
+      inputSchema: z.object({
         ...paginationSchema,
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -48,9 +48,9 @@ export function register(server: McpServer): void {
       title: "Get Club",
       description:
         "Get detailed information about a club including description, member count, and sport type.",
-      inputSchema: {
+      inputSchema: z.object({
         club_id: z.coerce.number().int().describe("The club ID"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -74,10 +74,10 @@ export function register(server: McpServer): void {
       title: "List Club Activities",
       description:
         "List recent activities by members of a club. Only includes activities set to 'Everyone' visibility.",
-      inputSchema: {
+      inputSchema: z.object({
         club_id: z.coerce.number().int().describe("The club ID"),
         ...paginationSchema,
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -112,10 +112,10 @@ export function register(server: McpServer): void {
     {
       title: "List Club Members",
       description: "List members of a club.",
-      inputSchema: {
+      inputSchema: z.object({
         club_id: z.coerce.number().int().describe("The club ID"),
         ...paginationSchema,
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -150,10 +150,10 @@ export function register(server: McpServer): void {
     {
       title: "List Club Admins",
       description: "List admins of a club.",
-      inputSchema: {
+      inputSchema: z.object({
         club_id: z.coerce.number().int().describe("The club ID"),
         ...paginationSchema,
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

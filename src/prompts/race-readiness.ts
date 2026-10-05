@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { stravaGet } from "../strava-client.js";
 import {
@@ -24,14 +24,14 @@ export function register(server: McpServer): void {
       title: "Race Readiness Assessment",
       description:
         "Assess fitness and race readiness based on recent training history and athlete stats.",
-      argsSchema: {
+      argsSchema: z.object({
         distance: z
           .string()
           .optional()
           .describe(
             "Target race distance (e.g. '5k', '10k', 'half marathon', 'marathon')",
           ),
-      },
+      }),
     },
     async ({ distance }) => {
       const athlete = await stravaGet<DetailedAthlete>("/athlete");

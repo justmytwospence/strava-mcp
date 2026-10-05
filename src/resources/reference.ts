@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import {
   ACTIVITY_STREAM_KEYS,
   SEGMENT_STREAM_KEYS,

@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import polyline from "@mapbox/polyline";
 import { buildGPX, BaseBuilder } from "gpx-builder";
@@ -21,9 +21,9 @@ export function register(server: McpServer): void {
       title: "Get Segment",
       description:
         "Get detailed information about a segment including distance, elevation, grade, effort count, and athlete count.",
-      inputSchema: {
+      inputSchema: z.object({
         segment_id: z.coerce.number().int().describe("The segment ID"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -49,7 +49,7 @@ export function register(server: McpServer): void {
       title: "List Segment Efforts",
       description:
         "List efforts on a segment, optionally filtered by date range. Returns the authenticated athlete's efforts by default.",
-      inputSchema: {
+      inputSchema: z.object({
         segment_id: z.coerce.number().int().describe("The segment ID"),
         start_date_local: z
           .string()
@@ -66,7 +66,7 @@ export function register(server: McpServer): void {
           .max(200)
           .default(30)
           .describe("Results per page (1-200, default 30)"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -108,9 +108,9 @@ export function register(server: McpServer): void {
       title: "Get Segment Effort",
       description:
         "Get a specific segment effort by ID, including elapsed time, heart rate, watts, and achievements.",
-      inputSchema: {
+      inputSchema: z.object({
         effort_id: z.string().describe("The segment effort ID"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -136,7 +136,7 @@ export function register(server: McpServer): void {
       title: "Explore Segments",
       description:
         'Find popular segments within a geographic bounding box. Provide SW and NE corner coordinates as a comma-separated string: "sw_lat,sw_lng,ne_lat,ne_lng".',
-      inputSchema: {
+      inputSchema: z.object({
         bounds: z
           .string()
           .describe(
@@ -160,7 +160,7 @@ export function register(server: McpServer): void {
           .max(5)
           .optional()
           .describe("Maximum climb category (0-5)"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -196,10 +196,10 @@ export function register(server: McpServer): void {
     {
       title: "Star/Unstar Segment",
       description: "Star or unstar a segment for the authenticated athlete.",
-      inputSchema: {
+      inputSchema: z.object({
         segment_id: z.coerce.number().int().describe("The segment ID"),
         starred: z.boolean().describe("True to star, false to unstar"),
-      },
+      }),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -232,9 +232,9 @@ export function register(server: McpServer): void {
       title: "Export Segment as GPX",
       description:
         "Export a Strava segment as a GPX file for navigation. Returns GPX XML that can be imported into Garmin Connect, Coros, or other GPS devices. Note: The Strava API does not support uploading routes, so the GPX must be imported manually into your device/app.",
-      inputSchema: {
+      inputSchema: z.object({
         segment_id: z.coerce.number().int().describe("The segment ID"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

@@ -18,13 +18,13 @@
     "prepare": "npm run build"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "@mapbox/polyline": "^1.2.1",
-    "@modelcontextprotocol/sdk": "^1.6.1",
+    "@modelcontextprotocol/server": "^2.3.0",
     "gpx-builder": "^6.0.0",
-    "zod": "^3.23.8"
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/mapbox__polyline": "^1.0.5",

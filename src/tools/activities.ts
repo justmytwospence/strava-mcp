@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { stravaGet, stravaPost, stravaPut } from "../strava-client.js";
 import { formatToolError } from "../errors.js";
@@ -21,7 +21,7 @@ export function register(server: McpServer): void {
       title: "List Athlete Activities",
       description:
         "List the authenticated athlete's activities. Supports filtering by date range and pagination.",
-      inputSchema: {
+      inputSchema: z.object({
         before: z
           .coerce.number()
           .int()
@@ -33,7 +33,7 @@ export function register(server: McpServer): void {
           .optional()
           .describe("Only activities after this epoch timestamp (seconds)"),
         ...paginationSchema,
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -71,13 +71,13 @@ export function register(server: McpServer): void {
       title: "Get Activity",
       description:
         "Get detailed information about a specific activity including description, calories, splits, laps, segment efforts, and gear.",
-      inputSchema: {
+      inputSchema: z.object({
         activity_id: z.coerce.number().int().describe("The activity ID"),
         include_all_efforts: z
           .boolean()
           .default(false)
           .describe("Include all segment efforts (can be very large). Default false."),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -110,7 +110,7 @@ export function register(server: McpServer): void {
       title: "Create Activity",
       description:
         "Create a manual activity entry. Requires activity:write scope.",
-      inputSchema: {
+      inputSchema: z.object({
         name: z.string().describe("The name of the activity"),
         sport_type: z.enum(SPORT_TYPES).describe("The sport type (e.g. Run, Ride, Swim, Hike)"),
         start_date_local: z
@@ -135,7 +135,7 @@ export function register(server: McpServer): void {
           .boolean()
           .optional()
           .describe("Whether this was a commute"),
-      },
+      }),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -171,7 +171,7 @@ export function register(server: McpServer): void {
       title: "Update Activity",
       description:
         "Update an activity's mutable properties. Requires activity:write scope. Only provided fields are updated.",
-      inputSchema: {
+      inputSchema: z.object({
         activity_id: z.coerce.number().int().describe("The activity ID to update"),
         name: z.string().optional().describe("New name"),
         sport_type: z.enum(SPORT_TYPES).optional().describe("New sport type"),
@@ -186,7 +186,7 @@ export function register(server: McpServer): void {
           .boolean()
           .optional()
           .describe("Whether to mute this activity in the feed"),
-      },
+      }),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,
@@ -224,10 +224,10 @@ export function register(server: McpServer): void {
     {
       title: "List Activity Comments",
       description: "List comments on an activity.",
-      inputSchema: {
+      inputSchema: z.object({
         activity_id: z.coerce.number().int().describe("The activity ID"),
         ...paginationSchema,
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -262,10 +262,10 @@ export function register(server: McpServer): void {
     {
       title: "List Activity Kudoers",
       description: "List athletes who gave kudos on an activity.",
-      inputSchema: {
+      inputSchema: z.object({
         activity_id: z.coerce.number().int().describe("The activity ID"),
         ...paginationSchema,
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -301,9 +301,9 @@ export function register(server: McpServer): void {
       title: "List Activity Laps",
       description:
         "List laps of an activity. Each lap includes distance, time, speed, heart rate, watts, and elevation.",
-      inputSchema: {
+      inputSchema: z.object({
         activity_id: z.coerce.number().int().describe("The activity ID"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -329,9 +329,9 @@ export function register(server: McpServer): void {
       title: "List Activity Zones",
       description:
         "Get heart rate and power zone distribution for an activity. Shows time spent in each zone.",
-      inputSchema: {
+      inputSchema: z.object({
         activity_id: z.coerce.number().int().describe("The activity ID"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

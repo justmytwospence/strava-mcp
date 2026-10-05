@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { stravaGet } from "../strava-client.js";
 import {
@@ -35,14 +35,14 @@ export function register(server: McpServer): void {
       title: "Weekly Training Summary",
       description:
         "Summarize training for a given week based on Strava activities.",
-      argsSchema: {
+      argsSchema: z.object({
         week_start: z
           .string()
           .optional()
           .describe(
             "ISO 8601 date for the start of the week (defaults to last Monday)",
           ),
-      },
+      }),
     },
     async ({ week_start }) => {
       const start = week_start

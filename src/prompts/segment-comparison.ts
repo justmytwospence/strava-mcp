@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { stravaGet } from "../strava-client.js";
 import {
@@ -15,11 +15,11 @@ export function register(server: McpServer): void {
       title: "Segment Effort Comparison",
       description:
         "Compare all your efforts on a Strava segment over time to identify trends and improvements.",
-      argsSchema: {
+      argsSchema: z.object({
         segment_id: z
           .string()
           .describe("The Strava segment ID to compare efforts on"),
-      },
+      }),
     },
     async ({ segment_id }) => {
       const segment = await stravaGet<DetailedSegment>(

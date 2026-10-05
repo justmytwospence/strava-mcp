@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { stravaGet } from "../strava-client.js";
 import {
@@ -15,12 +15,12 @@ export function register(server: McpServer): void {
       title: "Training Plan Review",
       description:
         "Review recent training load and suggest adjustments based on activity history.",
-      argsSchema: {
+      argsSchema: z.object({
         days: z
           .string()
           .optional()
           .describe("Number of days to look back (default 30)"),
-      },
+      }),
     },
     async ({ days }) => {
       const numDays = days ? parseInt(days, 10) : 30;

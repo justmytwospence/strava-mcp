@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { stravaGet, stravaPost } from "../strava-client.js";
 import { formatToolError } from "../errors.js";
@@ -14,9 +14,9 @@ export function register(server: McpServer): void {
       title: "Get Upload Status",
       description:
         "Check the processing status of an upload. Returns status, error info, and the resulting activity ID once complete.",
-      inputSchema: {
+      inputSchema: z.object({
         upload_id: z.coerce.number().int().describe("The upload ID"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -40,7 +40,7 @@ export function register(server: McpServer): void {
       title: "Upload Activity File",
       description:
         "Upload an activity file (FIT, TCX, or GPX format) to create a new activity. The file content must be base64-encoded. Returns an upload ID to check processing status with strava_get_upload.",
-      inputSchema: {
+      inputSchema: z.object({
         file_content: z
           .string()
           .describe("Base64-encoded file content"),
@@ -61,7 +61,7 @@ export function register(server: McpServer): void {
           .string()
           .optional()
           .describe("External identifier for deduplication"),
-      },
+      }),
       annotations: {
         readOnlyHint: false,
         destructiveHint: false,

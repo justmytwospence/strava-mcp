@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { stravaGet } from "../strava-client.js";
 import type { DetailedAthlete, AthleteStats } from "../types.js";
 

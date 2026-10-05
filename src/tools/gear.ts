@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { stravaGet } from "../strava-client.js";
 import { formatToolError } from "../errors.js";
@@ -12,11 +12,11 @@ export function register(server: McpServer): void {
       title: "Get Gear",
       description:
         'Get equipment details by ID (name, brand, model, total distance). Gear IDs look like "b12345" for bikes or "g12345" for shoes.',
-      inputSchema: {
+      inputSchema: z.object({
         gear_id: z
           .string()
           .describe('The gear ID (e.g. "b12345" for a bike, "g12345" for shoes)'),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

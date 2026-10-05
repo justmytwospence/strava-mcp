@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { stravaGet } from "../strava-client.js";
 import {
@@ -25,9 +25,9 @@ export function register(server: McpServer): void {
       title: "Activity Deep Analysis",
       description:
         "Fetch a Strava activity with streams and request a detailed analysis of pacing, effort, and performance.",
-      argsSchema: {
+      argsSchema: z.object({
         activity_id: z.string().describe("The Strava activity ID to analyze"),
-      },
+      }),
     },
     async ({ activity_id }) => {
       const activity = await stravaGet<DetailedActivity>(

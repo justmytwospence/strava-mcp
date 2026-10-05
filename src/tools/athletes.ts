@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { stravaGet } from "../strava-client.js";
 import { formatToolError } from "../errors.js";
@@ -18,7 +18,7 @@ export function register(server: McpServer): void {
       title: "Get Authenticated Athlete",
       description:
         "Get the profile of the currently authenticated athlete, including name, location, stats summary, bikes, and shoes.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -42,7 +42,7 @@ export function register(server: McpServer): void {
       title: "Get Athlete Zones",
       description:
         "Get the authenticated athlete's heart rate and power zones.",
-      inputSchema: {},
+      inputSchema: z.object({}),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -66,12 +66,12 @@ export function register(server: McpServer): void {
       title: "Get Athlete Stats",
       description:
         "Get activity statistics for an athlete: recent, year-to-date, and all-time totals for runs, rides, and swims. Includes biggest ride distance and biggest climb.",
-      inputSchema: {
+      inputSchema: z.object({
         athlete_id: z
           .coerce.number()
           .int()
           .describe("The athlete ID. Use the authenticated athlete's ID from strava_get_authenticated_athlete."),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -97,9 +97,9 @@ export function register(server: McpServer): void {
       title: "List Starred Segments",
       description:
         "List segments starred by the authenticated athlete.",
-      inputSchema: {
+      inputSchema: z.object({
         ...paginationSchema,
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

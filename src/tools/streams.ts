@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { stravaGet } from "../strava-client.js";
 import { formatToolError } from "../errors.js";
@@ -49,7 +49,7 @@ export function register(server: McpServer): void {
       title: "Get Activity Streams",
       description:
         "Get high-resolution time-series data for an activity (heart rate, power, cadence, altitude, GPS coordinates, etc.). Data is downsampled if too large.",
-      inputSchema: {
+      inputSchema: z.object({
         activity_id: z.coerce.number().int().describe("The activity ID"),
         keys: coerceArray(z
           .array(z.enum(ACTIVITY_STREAM_KEYS))
@@ -64,7 +64,7 @@ export function register(server: McpServer): void {
           .max(2000)
           .default(500)
           .describe("Maximum data points to return (10-2000, default 500). Streams are downsampled if larger."),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -107,7 +107,7 @@ export function register(server: McpServer): void {
       title: "Get Segment Effort Streams",
       description:
         "Get high-resolution time-series data for a segment effort.",
-      inputSchema: {
+      inputSchema: z.object({
         effort_id: z.string().describe("The segment effort ID"),
         keys: coerceArray(z
           .array(z.enum(ACTIVITY_STREAM_KEYS))
@@ -120,7 +120,7 @@ export function register(server: McpServer): void {
           .max(2000)
           .default(500)
           .describe("Maximum data points (10-2000, default 500)"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -163,7 +163,7 @@ export function register(server: McpServer): void {
       title: "Get Segment Streams",
       description:
         "Get GPS coordinates, distance, and altitude data for a segment.",
-      inputSchema: {
+      inputSchema: z.object({
         segment_id: z.coerce.number().int().describe("The segment ID"),
         keys: coerceArray(z
           .array(z.enum(SEGMENT_STREAM_KEYS))
@@ -176,7 +176,7 @@ export function register(server: McpServer): void {
           .max(2000)
           .default(500)
           .describe("Maximum data points (10-2000, default 500)"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -219,7 +219,7 @@ export function register(server: McpServer): void {
       title: "Get Route Streams",
       description:
         "Get GPS coordinates, distance, and altitude data for a route.",
-      inputSchema: {
+      inputSchema: z.object({
         route_id: z.string().describe("The route ID"),
         max_points: z
           .coerce.number()
@@ -228,7 +228,7 @@ export function register(server: McpServer): void {
           .max(2000)
           .default(500)
           .describe("Maximum data points (10-2000, default 500)"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,

@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { stravaGet } from "../strava-client.js";
 import { formatToolError } from "../errors.js";
@@ -12,10 +12,10 @@ export function register(server: McpServer): void {
     {
       title: "List Athlete Routes",
       description: "List routes created by an athlete.",
-      inputSchema: {
+      inputSchema: z.object({
         athlete_id: z.coerce.number().int().describe("The athlete ID"),
         ...paginationSchema,
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -51,9 +51,9 @@ export function register(server: McpServer): void {
       title: "Get Route",
       description:
         "Get detailed route information including distance, elevation gain, and estimated moving time.",
-      inputSchema: {
+      inputSchema: z.object({
         route_id: z.string().describe("The route ID"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -77,9 +77,9 @@ export function register(server: McpServer): void {
       title: "Export Route as GPX",
       description:
         "Export a route as a GPX file. Returns raw GPX XML content.",
-      inputSchema: {
+      inputSchema: z.object({
         route_id: z.string().describe("The route ID"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -103,9 +103,9 @@ export function register(server: McpServer): void {
       title: "Export Route as TCX",
       description:
         "Export a route as a TCX file. Returns raw TCX XML content.",
-      inputSchema: {
+      inputSchema: z.object({
         route_id: z.string().describe("The route ID"),
-      },
+      }),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
