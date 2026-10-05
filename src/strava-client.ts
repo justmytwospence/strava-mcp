@@ -1,3 +1,5 @@
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { STRAVA_API_BASE, STRAVA_TOKEN_URL } from "./constants.js";
 import { StravaApiError } from "./errors.js";
 import type { TokenResponse } from "./types.js";
@@ -54,6 +56,51 @@ let accessToken = process.env.STRAVA_ACCESS_TOKEN ?? "";
 let refreshToken = process.env.STRAVA_REFRESH_TOKEN ?? "";
 let refreshPromise: Promise<void> | null = null;
 
+/**
+ * Optional token store. Strava can rotate the refresh token on any refresh, which
+ * would leave the one in the environment dead after the next restart. With
+ * STRAVA_TOKEN_FILE set, the latest pair is written there and preferred at startup.
+ */
+const tokenFile = process.env.STRAVA_TOKEN_FILE;
+
+function loadStoredTokens(): void {
+  if (!tokenFile) return;
+  try {
+    const stored = JSON.parse(readFileSync(tokenFile, "utf8")) as {
+      access_token?: string;
+      refresh_token?: string;
+    };
+    if (stored.refresh_token) {
+      refreshToken = stored.refresh_token;
+      accessToken = stored.access_token ?? "";
+    }
+  } catch {
+    // No store yet (first run) or unreadable: fall back to the environment.
+  }
+}
+
+function saveTokens(data: TokenResponse): void {
+  if (!tokenFile) return;
+  try {
+    mkdirSync(dirname(tokenFile), { recursive: true });
+    const tmp = `${tokenFile}.tmp`;
+    writeFileSync(
+      tmp,
+      JSON.stringify({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_at: data.expires_at,
+      }),
+      { mode: 0o600 },
+    );
+    renameSync(tmp, tokenFile);
+  } catch (err) {
+    console.error(`Could not write STRAVA_TOKEN_FILE (${tokenFile}):`, err);
+  }
+}
+
+loadStoredTokens();
+
 const clientId = process.env.STRAVA_CLIENT_ID ?? "";
 const clientSecret = process.env.STRAVA_CLIENT_SECRET ?? "";
 
@@ -84,15 +131,13 @@ async function refreshAccessToken(): Promise<void> {
 
     if (!res.ok) {
       const text = await res.text();
-      throw new StravaApiError(
-        res.status,
-        `Token refresh failed: ${text}`,
-      );
+      throw new StravaApiError(res.status, `Token refresh failed: ${text}`);
     }
 
     const data = (await res.json()) as TokenResponse;
     accessToken = data.access_token;
     refreshToken = data.refresh_token;
+    saveTokens(data);
   })();
 
   try {
