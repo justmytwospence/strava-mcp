@@ -62,6 +62,8 @@ Resources provide read-only context data that clients can pull into conversation
 |---|---|
 | `strava://athlete/profile` | Current authenticated athlete profile (name, location, bikes, shoes) |
 | `strava://athlete/stats` | Year-to-date and all-time activity totals for runs, rides, and swims |
+| `strava://reference/sport-types` | Valid `sport_type` values for create/update activity |
+| `strava://reference/stream-types` | Available stream keys, descriptions, and which tools accept them |
 
 ### Template Resources
 
@@ -103,6 +105,8 @@ export STRAVA_CLIENT_SECRET="your_client_secret"
 export STRAVA_ACCESS_TOKEN="your_access_token"
 export STRAVA_REFRESH_TOKEN="your_refresh_token"
 ```
+
+Optionally set `STRAVA_UNITS` to `metric` or `imperial` to control how distances, paces, and elevations are formatted in prompts. If unset, the server uses the athlete's Strava measurement preference, falling back to metric.
 
 ### 4. Add to Claude Desktop
 

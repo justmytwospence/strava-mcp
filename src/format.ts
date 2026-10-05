@@ -16,7 +16,33 @@ export function jsonResult(data: unknown): {
   return textResult(JSON.stringify(data, null, 2));
 }
 
-export function formatDistance(meters: number): string {
+export type Units = "metric" | "imperial";
+
+const METERS_PER_MILE = 1609.344;
+const METERS_PER_FOOT = 0.3048;
+
+let defaultUnits: Units = "metric";
+
+/** Set the unit system used by format helpers when no explicit units are passed. */
+export function setDefaultUnits(units: Units): void {
+  defaultUnits = units;
+}
+
+export function getDefaultUnits(): Units {
+  return defaultUnits;
+}
+
+export function formatDistance(
+  meters: number,
+  units: Units = defaultUnits,
+): string {
+  if (units === "imperial") {
+    const miles = meters / METERS_PER_MILE;
+    if (miles >= 0.1) {
+      return `${miles.toFixed(2)} mi`;
+    }
+    return `${Math.round(meters / METERS_PER_FOOT)} ft`;
+  }
   if (meters >= 1000) {
     return `${(meters / 1000).toFixed(2)} km`;
   }
@@ -36,15 +62,26 @@ export function formatDuration(seconds: number): string {
   return `${s}s`;
 }
 
-export function formatPace(metersPerSecond: number): string {
+export function formatPace(
+  metersPerSecond: number,
+  units: Units = defaultUnits,
+): string {
   if (metersPerSecond <= 0) return "N/A";
-  const secPerKm = 1000 / metersPerSecond;
-  const min = Math.floor(secPerKm / 60);
-  const sec = Math.round(secPerKm % 60);
-  return `${min}:${sec.toString().padStart(2, "0")} /km`;
+  const distance = units === "imperial" ? METERS_PER_MILE : 1000;
+  const label = units === "imperial" ? "/mi" : "/km";
+  const secPerUnit = distance / metersPerSecond;
+  const min = Math.floor(secPerUnit / 60);
+  const sec = Math.round(secPerUnit % 60);
+  return `${min}:${sec.toString().padStart(2, "0")} ${label}`;
 }
 
-export function formatElevation(meters: number): string {
+export function formatElevation(
+  meters: number,
+  units: Units = defaultUnits,
+): string {
+  if (units === "imperial") {
+    return `${Math.round(meters / METERS_PER_FOOT)} ft`;
+  }
   return `${Math.round(meters)} m`;
 }
 

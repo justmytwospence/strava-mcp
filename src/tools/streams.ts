@@ -3,23 +3,8 @@ import { z } from "zod";
 import { stravaGet } from "../strava-client.js";
 import { formatToolError } from "../errors.js";
 import { jsonResult } from "../format.js";
+import { ACTIVITY_STREAM_KEYS, SEGMENT_STREAM_KEYS } from "../constants.js";
 import type { Stream } from "../types.js";
-
-const ACTIVITY_STREAM_KEYS = [
-  "time",
-  "distance",
-  "latlng",
-  "altitude",
-  "velocity_smooth",
-  "heartrate",
-  "cadence",
-  "watts",
-  "temp",
-  "moving",
-  "grade_smooth",
-] as const;
-
-const SEGMENT_STREAM_KEYS = ["latlng", "distance", "altitude"] as const;
 
 function coerceArray<T extends z.ZodTypeAny>(schema: T) {
   return z.preprocess((val) => {

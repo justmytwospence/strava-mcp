@@ -16,6 +16,11 @@ import { register as registerAthleteResources } from "./resources/athlete.js";
 import { register as registerActivityResources } from "./resources/activities.js";
 import { register as registerSegmentResources } from "./resources/segments.js";
 import { register as registerRouteResources } from "./resources/routes.js";
+import { register as registerReferenceResources } from "./resources/reference.js";
+
+import { stravaGet } from "./strava-client.js";
+import { setDefaultUnits } from "./format.js";
+import type { DetailedAthlete } from "./types.js";
 
 import { register as registerWeeklySummary } from "./prompts/weekly-summary.js";
 import { register as registerActivityAnalysis } from "./prompts/activity-analysis.js";
@@ -45,6 +50,35 @@ function validateEnv(): void {
   }
 }
 
+/**
+ * Apply an explicit STRAVA_UNITS override. Returns true if units were set.
+ * Synchronous and network-free, so it is safe to call before connecting.
+ */
+function applyUnitsFromEnv(): boolean {
+  const override = process.env.STRAVA_UNITS?.toLowerCase();
+  if (override === "metric" || override === "imperial") {
+    setDefaultUnits(override);
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Best-effort fallback: derive units from the athlete's measurement_preference.
+ * Runs after the transport is connected so it never delays the handshake or
+ * tool listing. Failure is non-fatal and leaves the metric default in place.
+ */
+async function resolveUnitsFromProfile(): Promise<void> {
+  try {
+    const athlete = await stravaGet<DetailedAthlete>("/athlete");
+    setDefaultUnits(
+      athlete.measurement_preference === "feet" ? "imperial" : "metric",
+    );
+  } catch {
+    // Keep the metric default if the profile cannot be fetched.
+  }
+}
+
 async function main(): Promise<void> {
   validateEnv();
 
@@ -66,6 +100,7 @@ async function main(): Promise<void> {
   registerActivityResources(server);
   registerSegmentResources(server);
   registerRouteResources(server);
+  registerReferenceResources(server);
 
   registerWeeklySummary(server);
   registerActivityAnalysis(server);
@@ -73,8 +108,14 @@ async function main(): Promise<void> {
   registerSegmentComparison(server);
   registerRaceReadiness(server);
 
+  const unitsFromEnv = applyUnitsFromEnv();
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
+
+  if (!unitsFromEnv) {
+    void resolveUnitsFromProfile();
+  }
 }
 
 main().catch((error) => {
