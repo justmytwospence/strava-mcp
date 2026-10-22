@@ -76,9 +76,10 @@ export interface Projection {
   statements: string[];
   /**
    * For the drift check: SQL yielding JSON objects (column `o`) from the current
-   * payloads of this type, with the keys the projection understands.
+   * payloads of this type, or directly their key names (column `k`, for objects too big
+   * to extract), with the keys the projection understands.
    */
-  shapes: Array<{ objects: string; known: Set<string> }>;
+  shapes: Array<{ objects?: string; keys?: string; known: Set<string> }>;
 }
 
 const IGNORED = ["resource_state", "id_str"];
@@ -211,7 +212,9 @@ export const PROJECTIONS: Projection[] = [
     shapes: [
       { objects: objects("activity_streams"), known: new Set(Object.keys(STREAM_CASTS)) },
       {
-        objects: `SELECT r.body->k AS o FROM raw_current r, unnest(json_keys(r.body)) t(k) WHERE r.object_type = 'activity_streams' AND r.body IS NOT NULL AND json_type(r.body) = 'OBJECT'`,
+        // Key names of each stream object, without extracting the (large) data arrays.
+        keys: `SELECT unnest(flatten(list_filter(json_keys(body, [${Object.keys(STREAM_CASTS).map((k) => `'$.${k}'`).join(", ")}]), x -> x IS NOT NULL))) AS k
+               FROM raw_current WHERE object_type = 'activity_streams' AND body IS NOT NULL AND json_type(body) = 'OBJECT'`,
         known: known(streamMeta, "data"),
       },
     ],
@@ -444,9 +447,8 @@ export async function drift(tx: Tx): Promise<Array<{ type: string; key: string; 
   const out: Array<{ type: string; key: string; example_count: number }> = [];
   for (const p of PROJECTIONS) {
     for (const shape of p.shapes) {
-      const rows = await tx.all<{ k: string; n: number }>(
-        `SELECT k, count(*)::INTEGER AS n FROM (SELECT unnest(json_keys(o)) AS k FROM (${shape.objects}) WHERE o IS NOT NULL AND json_type(o) = 'OBJECT') GROUP BY k`,
-      );
+      const keys = shape.keys ?? `SELECT unnest(json_keys(o)) AS k FROM (${shape.objects}) WHERE o IS NOT NULL AND json_type(o) = 'OBJECT'`;
+      const rows = await tx.all<{ k: string; n: number }>(`SELECT k, count(*)::INTEGER AS n FROM (${keys}) GROUP BY k`);
       for (const r of rows) if (!shape.known.has(r.k)) out.push({ type: p.type, key: r.k, example_count: r.n });
     }
   }
