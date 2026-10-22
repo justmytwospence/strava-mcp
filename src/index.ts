@@ -116,21 +116,29 @@ if (transport === "stdio") {
     c.json({ status: "ok", name: SERVER_NAME, version: VERSION }),
   );
 
-  // The read-only snapshot, for notebooks and dashboards. Disabled without a token.
-  const snapshotToken = process.env.SNAPSHOT_TOKEN ?? "";
-  const authorized = (header: string | undefined): boolean => {
-    const expected = Buffer.from(`Bearer ${snapshotToken}`);
+  const bearerMatches = (token: string, header: string | undefined): boolean => {
+    const expected = Buffer.from(`Bearer ${token}`);
     const given = Buffer.from(header ?? "");
     return given.length === expected.length && timingSafeEqual(given, expected);
   };
+
+  // The read-only snapshot, for notebooks and dashboards. Disabled without a token.
+  const snapshotToken = process.env.SNAPSHOT_TOKEN ?? "";
   app.on(["GET", "HEAD"], "/snapshot.duckdb", (c) => {
     if (!snapshotToken) return c.text("Snapshot serving is disabled (set SNAPSHOT_TOKEN)", 404);
-    if (!authorized(c.req.header("authorization"))) return c.text("Unauthorized", 401);
+    if (!bearerMatches(snapshotToken, c.req.header("authorization"))) return c.text("Unauthorized", 401);
     return snapshot.serve(c.req.raw);
   });
 
-  const mcp = (c: Context) =>
-    handler.fetch(c.req.raw, { parsedBody: c.get("parsedBody") });
+  // Optional bearer for the MCP endpoint itself, for when the server shares a network
+  // with callers that should reach only the snapshot.
+  const mcpToken = process.env.MCP_BEARER_TOKEN ?? "";
+  const mcp = (c: Context) => {
+    if (mcpToken && !bearerMatches(mcpToken, c.req.header("authorization"))) {
+      return c.json({ error: "unauthorized" }, 401);
+    }
+    return handler.fetch(c.req.raw, { parsedBody: c.get("parsedBody") });
+  };
   app.all("/mcp", mcp);
   app.all("/", mcp);
 

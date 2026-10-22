@@ -184,6 +184,7 @@ at `http://<host>:8000/mcp` (also at `/`), with a health check at `/health`, and
 | `STRAVA_DB_PATH` | `./state/strava.duckdb` (`/data/strava.duckdb` in the image) | The mirror; mount a volume |
 | `STRAVA_SNAPSHOT_DIR` | `snapshot/` next to the mirror | Where read-only snapshots are published |
 | `SNAPSHOT_TOKEN` | (unset: not served) | Bearer token for `GET /snapshot.duckdb` |
+| `MCP_BEARER_TOKEN` | (unset: open) | Require this bearer token on `/mcp` (e.g. from an auth proxy) |
 | `STRAVA_SYNC` | `on` | `off` serves from the mirror and fetches on demand, without background sync |
 | `STRAVA_API_BASE` | `https://www.strava.com/api/v3` | Strava moves the API to `https://api-v3.strava.com` (available 2027-01-04) |
 | `DUCKDB_MEMORY_LIMIT`, `DUCKDB_THREADS` | DuckDB defaults (`256MB`, `2` in the image) | Resource caps |
