@@ -96,3 +96,30 @@ export function formatDate(isoString: string): string {
     minute: "2-digit",
   });
 }
+
+/** Where an answer came from, appended to tool results as a second text block. */
+export interface ProvenanceNote {
+  source: "mirror" | "strava";
+  fetched_at: string | null;
+  stale?: string;
+}
+
+export function provenanceText(meta: ProvenanceNote): string {
+  const when = meta.fetched_at ? ` (fetched from Strava ${meta.fetched_at})` : "";
+  const origin = meta.source === "mirror" ? `[served from the local mirror${when}]` : "[fetched from Strava just now]";
+  return meta.stale ? `${origin} [stale: Strava could not be asked: ${meta.stale}]` : origin;
+}
+
+/** jsonResult plus a provenance line. */
+export function mirrorResult(data: unknown, meta: ProvenanceNote): {
+  content: Array<{ type: "text"; text: string }>;
+} {
+  const result = jsonResult(data);
+  result.content.push({ type: "text", text: provenanceText(meta) });
+  return result;
+}
+
+/** Page through an already-complete list the way Strava's page/per_page would. */
+export function pageOf<T>(items: T[], page: number, perPage: number): T[] {
+  return items.slice((page - 1) * perPage, page * perPage);
+}

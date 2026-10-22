@@ -1,8 +1,61 @@
 # Strava MCP Server
 
-An MCP (Model Context Protocol) server for the [Strava API v3](https://developers.strava.com/docs/reference/). Exposes Strava data through MCP tools, resources, and prompts. Built with TypeScript and the [MCP SDK](https://modelcontextprotocol.io/).
+An MCP (Model Context Protocol) server for the [Strava API v3](https://developers.strava.com/docs/reference/), backed by a complete local mirror of the athlete's Strava data in [DuckDB](https://duckdb.org/). Exposes it through MCP tools, resources, and prompts. Built with TypeScript and the [MCP SDK](https://modelcontextprotocol.io/).
+
+## The mirror
+
+The server keeps everything Strava's API returns for the authenticated athlete in one DuckDB
+file and answers tools from it, so most calls cost no Strava request and return in
+milliseconds. A background sync fills and refreshes it within Strava's rate limits.
+
+- **What is stored:** every activity (summary and full detail: laps, splits, best efforts,
+  every segment effort), full-resolution streams, heart-rate and power zones, kudos,
+  comments, photos, gear, segments and their geometry, starred segments, routes and their
+  geometry, clubs, the athlete's profile and zones, and a history of the athlete's totals.
+- **How:** every response is stored verbatim in `raw_payload` (a new row only when it
+  changed, so it doubles as edit history) and projected into typed tables with a
+  description and unit on every column (`strava_schema` lists them). Fields Strava adds
+  later stay in the raw JSON and are reported by `strava_sync_status` until mapped.
+- **Sync:** the first run lists every activity, then backfills newest first (detail,
+  streams, zones; then social, gear, routes, segments). New activities are picked up every
+  15 minutes, edits by a daily 90-day relist, deletions by a weekly full listing.
+- **Rate limits:** usage is read from Strava's `X-ReadRateLimit-*` and `X-RateLimit-*`
+  headers on every response. Background work may use at most 75% of each window and spreads
+  it evenly over the day; incremental sync 85-90%; tool calls the rest, so a person is never
+  starved. A 429 pauses everything until the window resets. Activity streams do not count
+  against the limits. With Strava's default limits (100 reads per 15 minutes, 1,000 a day)
+  a backfill of 2,000 activities takes about a week; the self-service upgrade in the API
+  settings (200/2,000) halves that.
+- **Freshness:** tools serve the stored copy when it is fresh for its kind (recent activities
+  are refreshed after 15 minutes, old ones only when their summary shows a change; streams
+  never change), fetch otherwise, and fall back to the stored copy, marked stale, when
+  Strava cannot be asked. Each result ends with a line saying where it came from.
+- **Writes** (`strava_update_activity`, `strava_create_activity`, `strava_star_segment`,
+  uploads) go to Strava first; what Strava returns is stored, never an optimistic guess.
+- **Other readers:** DuckDB allows one writing process, so the server publishes a consistent
+  read-only copy to `snapshot/strava.duckdb` next to the mirror (hourly when it changed;
+  every 6 hours during a backfill) and, with `SNAPSHOT_TOKEN` set, serves it at
+  `/snapshot.duckdb`:
+
+  ```sql
+  INSTALL httpfs; LOAD httpfs;
+  CREATE SECRET (TYPE http, EXTRA_HTTP_HEADERS MAP {'Authorization': 'Bearer <SNAPSHOT_TOKEN>'});
+  ATTACH 'http://<host>:8000/snapshot.duckdb' AS strava (READ_ONLY);
+  SELECT sport_type, count(*) FROM strava.activity GROUP BY ALL;
+  ```
+
+  Back up the snapshot, not the live file.
+
+Strava's API Agreement (June 2026) restricts caching beyond seven days and use with AI
+applications other than its own MCP. This server is meant for a single athlete's own data;
+whether that use is acceptable is yours to judge.
 
 ## Tools
+
+### The mirror
+- **strava_query** - Read-only DuckDB SQL over the whole mirror (no Strava requests)
+- **strava_schema** - Tables and columns, with descriptions and units
+- **strava_sync_status** - Coverage, queue, recent errors, rate-limit usage, unmapped fields
 
 ### Activities
 - **strava_list_activities** - List the authenticated athlete's activities with date range filtering and pagination
@@ -23,7 +76,6 @@ An MCP (Model Context Protocol) server for the [Strava API v3](https://developer
 - **strava_get_segment** - Get segment details including distance, elevation, grade, and effort count
 - **strava_list_segment_efforts** - List efforts on a segment with date range filtering
 - **strava_get_segment_effort** - Get a specific segment effort with achievements
-- **strava_explore_segments** - Find popular segments within a geographic bounding box
 - **strava_star_segment** - Star or unstar a segment
 
 ### Routes
@@ -41,9 +93,6 @@ An MCP (Model Context Protocol) server for the [Strava API v3](https://developer
 ### Clubs
 - **strava_list_athlete_clubs** - List clubs the athlete belongs to
 - **strava_get_club** - Get club details
-- **strava_list_club_activities** - List recent club member activities
-- **strava_list_club_members** - List club members
-- **strava_list_club_admins** - List club admins
 
 ### Gear
 - **strava_get_gear** - Get equipment details (bikes, shoes)
@@ -132,6 +181,12 @@ at `http://<host>:8000/mcp` (also at `/`), with a health check at `/health`, and
 | `MCP_TRANSPORT` | `stdio` (`http` in the image) | `stdio` or `http` |
 | `PORT` | `8000` | HTTP port |
 | `MCP_ALLOWED_HOSTS` | (any) | Comma-separated hostnames allowed in the `Host` header (set it behind a reverse proxy) |
+| `STRAVA_DB_PATH` | `./state/strava.duckdb` (`/data/strava.duckdb` in the image) | The mirror; mount a volume |
+| `STRAVA_SNAPSHOT_DIR` | `snapshot/` next to the mirror | Where read-only snapshots are published |
+| `SNAPSHOT_TOKEN` | (unset: not served) | Bearer token for `GET /snapshot.duckdb` |
+| `STRAVA_SYNC` | `on` | `off` serves from the mirror and fetches on demand, without background sync |
+| `STRAVA_API_BASE` | `https://www.strava.com/api/v3` | Strava moves the API to `https://api-v3.strava.com` (available 2027-01-04) |
+| `DUCKDB_MEMORY_LIMIT`, `DUCKDB_THREADS` | DuckDB defaults (`256MB`, `2` in the image) | Resource caps |
 
 Images: `ghcr.io/justmytwospence/strava-mcp`, published for amd64 and arm64 by pushing a
 `vX.Y.Z` tag.
@@ -182,7 +237,12 @@ Or if installed locally:
 npm install
 npm run build
 npm run dev    # watch mode with tsx
+npm test       # rate limiter, raw splitting, and the mirror against scrubbed real payloads
 ```
+
+The typed schema is declared once in `src/db/tables.ts` (columns, comments, and the JSON
+each is read from); DDL, projections and the drift check are generated from it. A new
+column needs a migration in `src/db/schema.ts`.
 
 ## License
 

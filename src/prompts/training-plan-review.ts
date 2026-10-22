@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { stravaGet } from "../strava-client.js";
+import { mirror } from "../context.js";
 import {
   formatDistance,
   formatDuration,
@@ -26,10 +26,7 @@ export function register(server: McpServer): void {
       const numDays = days ? parseInt(days, 10) : 30;
       const after = Math.floor(Date.now() / 1000) - numDays * 86400;
 
-      const activities = await stravaGet<SummaryActivity[]>(
-        "/athlete/activities",
-        { after, per_page: 200 },
-      );
+      const activities = (await mirror().listActivities({ after, page: 1, perPage: 200 })).data as SummaryActivity[];
 
       if (activities.length === 0) {
         return {

@@ -1,14 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { stravaGet } from "../strava-client.js";
+import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
-import { jsonResult } from "../format.js";
-import type {
-  DetailedAthlete,
-  AthleteZones,
-  AthleteStats,
-  SummarySegment,
-} from "../types.js";
+import { mirrorResult, pageOf } from "../format.js";
 import { paginationSchema, formatPaginationNote } from "../pagination.js";
 
 export function register(server: McpServer): void {
@@ -28,8 +22,8 @@ export function register(server: McpServer): void {
     },
     async () => {
       try {
-        const athlete = await stravaGet<DetailedAthlete>("/athlete");
-        return jsonResult(athlete);
+        const { data, meta } = await mirror().athlete();
+        return mirrorResult(data, meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -52,8 +46,8 @@ export function register(server: McpServer): void {
     },
     async () => {
       try {
-        const zones = await stravaGet<AthleteZones>("/athlete/zones");
-        return jsonResult(zones);
+        const { data, meta } = await mirror().athleteZones();
+        return mirrorResult(data, meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -81,10 +75,10 @@ export function register(server: McpServer): void {
     },
     async ({ athlete_id }: { athlete_id: number }) => {
       try {
-        const stats = await stravaGet<AthleteStats>(
-          `/athletes/${athlete_id}/stats`,
-        );
-        return jsonResult(stats);
+        // Strava only serves stats for the authenticated athlete, which the mirror tracks.
+        void athlete_id;
+        const { data, meta } = await mirror().athleteStats();
+        return mirrorResult(data, meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -109,12 +103,10 @@ export function register(server: McpServer): void {
     },
     async ({ page, per_page }: { page: number; per_page: number }) => {
       try {
-        const segments = await stravaGet<SummarySegment[]>(
-          "/segments/starred",
-          { page, per_page },
-        );
+        const { data, meta } = await mirror().starredSegments();
+        const segments = pageOf(data as unknown[], page, per_page);
         const note = formatPaginationNote(segments.length, page, per_page);
-        return jsonResult({ segments, _pagination: note });
+        return mirrorResult({ segments, _pagination: note }, meta);
       } catch (error) {
         return formatToolError(error);
       }

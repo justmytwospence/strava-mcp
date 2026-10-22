@@ -1,10 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { stravaGet } from "../strava-client.js";
+import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
-import { jsonResult, textResult } from "../format.js";
+import { mirrorResult, pageOf, textResult } from "../format.js";
 import { paginationSchema, formatPaginationNote } from "../pagination.js";
-import type { Route } from "../types.js";
 
 export function register(server: McpServer): void {
   server.registerTool(
@@ -33,12 +32,12 @@ export function register(server: McpServer): void {
       per_page: number;
     }) => {
       try {
-        const routes = await stravaGet<Route[]>(
-          `/athletes/${athlete_id}/routes`,
-          { page, per_page },
-        );
+        // Only the authenticated athlete's routes are mirrored (Strava serves no others).
+        void athlete_id;
+        const { data, meta } = await mirror().routes();
+        const routes = pageOf(data as unknown[], page, per_page);
         const note = formatPaginationNote(routes.length, page, per_page);
-        return jsonResult({ routes, _pagination: note });
+        return mirrorResult({ routes, _pagination: note }, meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -63,8 +62,8 @@ export function register(server: McpServer): void {
     },
     async ({ route_id }: { route_id: string }) => {
       try {
-        const route = await stravaGet<Route>(`/routes/${route_id}`);
-        return jsonResult(route);
+        const { data, meta } = await mirror().route(route_id);
+        return mirrorResult(data, meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -89,8 +88,8 @@ export function register(server: McpServer): void {
     },
     async ({ route_id }: { route_id: string }) => {
       try {
-        const gpx = await stravaGet<string>(`/routes/${route_id}/export_gpx`);
-        return textResult(gpx);
+        const { data } = await mirror().routeExport(route_id, "gpx");
+        return textResult(String(data));
       } catch (error) {
         return formatToolError(error);
       }
@@ -115,8 +114,8 @@ export function register(server: McpServer): void {
     },
     async ({ route_id }: { route_id: string }) => {
       try {
-        const tcx = await stravaGet<string>(`/routes/${route_id}/export_tcx`);
-        return textResult(tcx);
+        const { data } = await mirror().routeExport(route_id, "tcx");
+        return textResult(String(data));
       } catch (error) {
         return formatToolError(error);
       }

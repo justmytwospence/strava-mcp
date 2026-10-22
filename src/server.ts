@@ -15,7 +15,8 @@ import { register as registerSegmentResources } from "./resources/segments.js";
 import { register as registerRouteResources } from "./resources/routes.js";
 import { register as registerReferenceResources } from "./resources/reference.js";
 
-import { stravaGet } from "./strava-client.js";
+import { mirror } from "./context.js";
+import { register as registerMirrorTools } from "./tools/mirror-tools.js";
 import { setDefaultUnits } from "./format.js";
 import type { DetailedAthlete } from "./types.js";
 
@@ -72,7 +73,7 @@ export function applyUnitsFromEnv(): boolean {
  */
 export async function resolveUnitsFromProfile(): Promise<void> {
   try {
-    const athlete = await stravaGet<DetailedAthlete>("/athlete");
+    const athlete = (await mirror().athlete()).data as DetailedAthlete;
     setDefaultUnits(
       athlete.measurement_preference === "feet" ? "imperial" : "metric",
     );
@@ -97,6 +98,7 @@ export function createServer(): McpServer {
   registerSegments(server);
   registerStreams(server);
   registerUploads(server);
+  registerMirrorTools(server);
 
   registerAthleteResources(server);
   registerActivityResources(server);

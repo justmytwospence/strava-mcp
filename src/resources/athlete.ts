@@ -1,5 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/server";
-import { stravaGet } from "../strava-client.js";
+import { mirror } from "../context.js";
 import type { DetailedAthlete, AthleteStats } from "../types.js";
 
 export function register(server: McpServer): void {
@@ -12,7 +12,7 @@ export function register(server: McpServer): void {
       mimeType: "application/json",
     },
     async (uri) => {
-      const athlete = await stravaGet<DetailedAthlete>("/athlete");
+      const athlete = (await mirror().athlete()).data as DetailedAthlete;
       return {
         contents: [
           {
@@ -34,10 +34,7 @@ export function register(server: McpServer): void {
       mimeType: "application/json",
     },
     async (uri) => {
-      const athlete = await stravaGet<DetailedAthlete>("/athlete");
-      const stats = await stravaGet<AthleteStats>(
-        `/athletes/${athlete.id}/stats`,
-      );
+      const stats = (await mirror().athleteStats()).data as AthleteStats;
       return {
         contents: [
           {

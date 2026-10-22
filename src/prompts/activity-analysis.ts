@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { stravaGet } from "../strava-client.js";
+import { mirror } from "../context.js";
 import {
   formatDistance,
   formatDuration,
@@ -30,27 +30,27 @@ export function register(server: McpServer): void {
       }),
     },
     async ({ activity_id }) => {
-      const activity = await stravaGet<DetailedActivity>(
-        `/activities/${activity_id}`,
-        { include_all_efforts: true },
-      );
+      const activity = (await mirror().activity(String(activity_id))).data as DetailedActivity;
 
       let streamsText = "";
       try {
-        const streams = await stravaGet<Stream[]>(
-          `/activities/${activity_id}/streams`,
-          {
-            keys: "time,distance,heartrate,altitude,velocity_smooth,cadence,watts",
-            key_by_type: true,
-          },
-        );
-        const streamSummaries = streams.map((s) => {
-          const data = s.data as number[];
-          const min = Math.min(...data);
-          const max = Math.max(...data);
-          const avg = data.reduce((a, b) => a + b, 0) / data.length;
-          return `  ${s.type}: min=${min.toFixed(1)}, max=${max.toFixed(1)}, avg=${avg.toFixed(1)} (${data.length} points)`;
-        });
+        const wanted = ["time", "distance", "heartrate", "altitude", "velocity_smooth", "cadence", "watts"];
+        const all = (await mirror().activityStreams(String(activity_id))).data as Record<string, Stream>;
+        const streamSummaries = wanted
+          .filter((k) => Array.isArray(all[k]?.data) && all[k]!.data.length > 0)
+          .map((k) => {
+            const data = all[k]!.data as number[];
+            let min = Number.POSITIVE_INFINITY;
+            let max = Number.NEGATIVE_INFINITY;
+            let sum = 0;
+            for (const v of data) {
+              if (v < min) min = v;
+              if (v > max) max = v;
+              sum += v;
+            }
+            const avg = sum / data.length;
+            return `  ${k}: min=${min.toFixed(1)}, max=${max.toFixed(1)}, avg=${avg.toFixed(1)} (${data.length} points)`;
+          });
         streamsText = "\nStream summaries:\n" + streamSummaries.join("\n");
       } catch {
         streamsText = "\n(Stream data not available for this activity)";

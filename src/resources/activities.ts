@@ -1,5 +1,5 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
-import { stravaGet } from "../strava-client.js";
+import { mirror } from "../context.js";
 import type { DetailedActivity } from "../types.js";
 
 export function register(server: McpServer): void {
@@ -13,9 +13,7 @@ export function register(server: McpServer): void {
       mimeType: "application/json",
     },
     async (uri, variables) => {
-      const activity = await stravaGet<DetailedActivity>(
-        `/activities/${variables.activityId}`,
-      );
+      const activity = (await mirror().activity(String(variables.activityId))).data as DetailedActivity;
       return {
         contents: [
           {

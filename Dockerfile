@@ -12,12 +12,17 @@ RUN npm run build && npm prune --omit=dev
 FROM node:24-alpine
 ENV NODE_ENV=production \
     MCP_TRANSPORT=http \
-    PORT=8000
+    PORT=8000 \
+    STRAVA_DB_PATH=/data/strava.duckdb \
+    STRAVA_TOKEN_FILE=/data/tokens.json \
+    DUCKDB_MEMORY_LIMIT=256MB \
+    DUCKDB_THREADS=2
 WORKDIR /app
 COPY --from=build /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-# Token store (STRAVA_TOKEN_FILE); a named volume mounted here inherits the ownership.
+# The mirror (strava.duckdb), its snapshots (snapshot/) and the token store; a named volume
+# mounted here inherits the ownership.
 RUN mkdir /data && chown node:node /data
 USER node
 EXPOSE 8000

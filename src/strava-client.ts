@@ -2,14 +2,26 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { STRAVA_API_BASE, STRAVA_TOKEN_URL } from "./constants.js";
 import { StravaApiError } from "./errors.js";
+import { type Priority, RateLimiter } from "./sync/rate-limit.js";
 import type { TokenResponse } from "./types.js";
+
+/** Every request goes through this limiter; the sync engine reads its status. */
+export const limiter = new RateLimiter();
+
+/** Raised when a request would have to wait longer than its caller allows. */
+export class RateLimitWaitError extends Error {
+  constructor(public readonly delayMs: number) {
+    super(`Strava rate limit: the next request of this kind is allowed in ${Math.ceil(delayMs / 1000)}s`);
+    this.name = "RateLimitWaitError";
+  }
+}
 
 /**
  * Parse JSON while converting integers with 16+ digits to strings
  * to prevent precision loss beyond Number.MAX_SAFE_INTEGER.
  * Uses a simple state machine to avoid modifying numbers inside strings.
  */
-function safeJsonParse(text: string): unknown {
+export function safeJsonParse(text: string): unknown {
   let result = "";
   let inString = false;
   let escaped = false;
@@ -147,21 +159,32 @@ async function refreshAccessToken(): Promise<void> {
   }
 }
 
-async function request<T>(
+export interface RequestOptions {
+  params?: Record<string, unknown>;
+  body?: Record<string, unknown> | FormData;
+  /** Rate-limit class; tools are interactive, the sync worker background. */
+  priority?: Priority;
+  /** Give up with RateLimitWaitError rather than wait longer than this. */
+  maxWaitMs?: number;
+}
+
+/** The response body as text, exactly as Strava sent it, plus its status. */
+export async function requestRaw(
   method: string,
   path: string,
-  options?: {
-    params?: Record<string, unknown>;
-    body?: Record<string, unknown> | FormData;
-  },
+  options: RequestOptions = {},
   retried = false,
-): Promise<T> {
+): Promise<{ status: number; text: string; contentType: string }> {
   if (!accessToken) {
     await refreshAccessToken();
   }
+  const priority = options.priority ?? "interactive";
+  if (!(await limiter.acquire(priority, method, path, options.maxWaitMs))) {
+    throw new RateLimitWaitError(limiter.delayFor(priority, method, path));
+  }
 
   const url = new URL(`${STRAVA_API_BASE}${path}`);
-  if (options?.params) {
+  if (options.params) {
     for (const [key, value] of Object.entries(options.params)) {
       if (value !== undefined && value !== null) {
         url.searchParams.set(key, String(value));
@@ -174,9 +197,9 @@ async function request<T>(
   };
 
   let requestBody: string | FormData | undefined;
-  if (options?.body instanceof FormData) {
+  if (options.body instanceof FormData) {
     requestBody = options.body;
-  } else if (options?.body) {
+  } else if (options.body) {
     headers["Content-Type"] = "application/json";
     requestBody = JSON.stringify(options.body);
   }
@@ -186,31 +209,35 @@ async function request<T>(
     headers,
     body: requestBody,
   });
+  limiter.observe(method, path, res.status, res.headers, priority);
 
   // On 401, try refreshing the token once
   if (res.status === 401 && !retried) {
     await refreshAccessToken();
-    return request<T>(method, path, options, true);
+    return requestRaw(method, path, options, true);
   }
 
+  const text = await res.text();
   if (!res.ok) {
-    const text = await res.text();
     throw new StravaApiError(res.status, text);
   }
+  return { status: res.status, text, contentType: res.headers.get("content-type") ?? "" };
+}
 
-  const contentType = res.headers.get("content-type") ?? "";
+async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
+  const { text, contentType } = await requestRaw(method, path, options);
   if (contentType.includes("application/json")) {
-    const text = await res.text();
     return safeJsonParse(text) as T;
   }
-  return (await res.text()) as unknown as T;
+  return text as unknown as T;
 }
 
 export function stravaGet<T>(
   path: string,
   params?: Record<string, unknown>,
+  options: Omit<RequestOptions, "params" | "body"> = {},
 ): Promise<T> {
-  return request<T>("GET", path, { params });
+  return request<T>("GET", path, { ...options, params });
 }
 
 export function stravaPost<T>(

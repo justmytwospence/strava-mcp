@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { stravaGet } from "../strava-client.js";
+import { mirror } from "../context.js";
 import {
   formatDistance,
   formatDuration,
@@ -22,14 +22,9 @@ export function register(server: McpServer): void {
       }),
     },
     async ({ segment_id }) => {
-      const segment = await stravaGet<DetailedSegment>(
-        `/segments/${segment_id}`,
-      );
-
-      const efforts = await stravaGet<SegmentEffort[]>("/segment_efforts", {
-        segment_id,
-        per_page: 200,
-      });
+      const m = mirror();
+      const segment = (await m.segment(String(segment_id))).data as DetailedSegment;
+      const efforts = (await m.segmentEfforts(String(segment_id), {}, 200)).data as SegmentEffort[];
 
       const segmentInfo = [
         `Segment: ${segment.name}`,

@@ -1,10 +1,9 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { stravaGet } from "../strava-client.js";
+import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
-import { jsonResult } from "../format.js";
+import { mirrorResult } from "../format.js";
 import { ACTIVITY_STREAM_KEYS, SEGMENT_STREAM_KEYS } from "../constants.js";
-import type { Stream } from "../types.js";
 
 function coerceArray<T extends z.ZodTypeAny>(schema: T) {
   return z.preprocess((val) => {
@@ -19,27 +18,35 @@ function coerceArray<T extends z.ZodTypeAny>(schema: T) {
   }, schema);
 }
 
-function downsample(streams: Stream[], maxPoints: number): { streams: Stream[]; downsampled: boolean } {
-  if (streams.length === 0) return { streams, downsampled: false };
+type StreamSet = Record<string, { data: unknown[]; original_size?: number; resolution?: string; series_type?: string }>;
 
-  const originalSize = streams[0]?.original_size ?? streams[0]?.data?.length ?? 0;
-  if (originalSize <= maxPoints) return { streams, downsampled: false };
-
-  const step = Math.ceil(originalSize / maxPoints);
-  const result = streams.map((stream) => {
-    const data = stream.data;
-    const sampled: unknown[] = [];
-    for (let i = 0; i < data.length; i += step) {
-      sampled.push(data[i]);
-    }
-    // Always include the last point
-    if (data.length > 0 && (data.length - 1) % step !== 0) {
-      sampled.push(data[data.length - 1]);
-    }
-    return { ...stream, data: sampled, original_size: data.length };
-  });
-
-  return { streams: result, downsampled: true };
+/**
+ * Normalize either stream shape (keyed by type, or an array of {type, data}) to an
+ * object keyed by type, keep the requested keys, and thin every stream with the same
+ * stride so the points stay aligned.
+ */
+function selectStreams(raw: unknown, keys: string[] | null, maxPoints: number) {
+  const set: StreamSet = {};
+  if (Array.isArray(raw)) {
+    for (const s of raw as Array<{ type: string; data: unknown[] }>) set[s.type] = s;
+  } else if (raw && typeof raw === "object") {
+    Object.assign(set, raw);
+  }
+  const wanted = keys ? Object.fromEntries(Object.entries(set).filter(([k]) => keys.includes(k))) : set;
+  const total = Math.max(0, ...Object.values(wanted).map((s) => s.data?.length ?? 0));
+  if (total <= maxPoints) {
+    return { streams: wanted, _meta: { total_points: total, returned_points: total, downsampled: false } };
+  }
+  const step = Math.ceil(total / maxPoints);
+  const thinned: StreamSet = {};
+  for (const [k, s] of Object.entries(wanted)) {
+    const data: unknown[] = [];
+    for (let i = 0; i < s.data.length; i += step) data.push(s.data[i]);
+    if (s.data.length > 0 && (s.data.length - 1) % step !== 0) data.push(s.data[s.data.length - 1]);
+    thinned[k] = { ...s, data, original_size: s.data.length };
+  }
+  const returned = Math.max(0, ...Object.values(thinned).map((s) => s.data.length));
+  return { streams: thinned, _meta: { total_points: total, returned_points: returned, downsampled: true, step } };
 }
 
 export function register(server: McpServer): void {
@@ -82,19 +89,8 @@ export function register(server: McpServer): void {
       max_points: number;
     }) => {
       try {
-        const streams = await stravaGet<Stream[]>(
-          `/activities/${activity_id}/streams`,
-          { keys: keys.join(","), key_by_type: true },
-        );
-        const { streams: result, downsampled } = downsample(streams, max_points);
-        return jsonResult({
-          streams: result,
-          _meta: {
-            total_points: streams[0]?.original_size ?? streams[0]?.data?.length ?? 0,
-            returned_points: result[0]?.data?.length ?? 0,
-            downsampled,
-          },
-        });
+        const { data, meta } = await mirror().activityStreams(String(activity_id));
+        return mirrorResult(selectStreams(data, keys, max_points), meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -138,19 +134,8 @@ export function register(server: McpServer): void {
       max_points: number;
     }) => {
       try {
-        const streams = await stravaGet<Stream[]>(
-          `/segment_efforts/${effort_id}/streams`,
-          { keys: keys.join(","), key_by_type: true },
-        );
-        const { streams: result, downsampled } = downsample(streams, max_points);
-        return jsonResult({
-          streams: result,
-          _meta: {
-            total_points: streams[0]?.original_size ?? streams[0]?.data?.length ?? 0,
-            returned_points: result[0]?.data?.length ?? 0,
-            downsampled,
-          },
-        });
+        const { data, meta } = await mirror().segmentEffortStreams(effort_id);
+        return mirrorResult(selectStreams(data, keys, max_points), meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -194,19 +179,8 @@ export function register(server: McpServer): void {
       max_points: number;
     }) => {
       try {
-        const streams = await stravaGet<Stream[]>(
-          `/segments/${segment_id}/streams`,
-          { keys: keys.join(","), key_by_type: true },
-        );
-        const { streams: result, downsampled } = downsample(streams, max_points);
-        return jsonResult({
-          streams: result,
-          _meta: {
-            total_points: streams[0]?.original_size ?? streams[0]?.data?.length ?? 0,
-            returned_points: result[0]?.data?.length ?? 0,
-            downsampled,
-          },
-        });
+        const { data, meta } = await mirror().segmentStreams(String(segment_id));
+        return mirrorResult(selectStreams(data, keys, max_points), meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -244,18 +218,8 @@ export function register(server: McpServer): void {
       max_points: number;
     }) => {
       try {
-        const streams = await stravaGet<Stream[]>(
-          `/routes/${route_id}/streams`,
-        );
-        const { streams: result, downsampled } = downsample(streams, max_points);
-        return jsonResult({
-          streams: result,
-          _meta: {
-            total_points: streams[0]?.original_size ?? streams[0]?.data?.length ?? 0,
-            returned_points: result[0]?.data?.length ?? 0,
-            downsampled,
-          },
-        });
+        const { data, meta } = await mirror().routeStreams(route_id);
+        return mirrorResult(selectStreams(data, null, max_points), meta);
       } catch (error) {
         return formatToolError(error);
       }

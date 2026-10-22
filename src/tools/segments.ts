@@ -2,15 +2,10 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import polyline from "@mapbox/polyline";
 import { buildGPX, BaseBuilder } from "gpx-builder";
-import { stravaGet, stravaPut } from "../strava-client.js";
+import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
-import { jsonResult, textResult, formatDistance } from "../format.js";
-import { paginationSchema, formatPaginationNote } from "../pagination.js";
-import type {
-  DetailedSegment,
-  SegmentEffort,
-  ExplorerSegment,
-} from "../types.js";
+import { jsonResult, mirrorResult, textResult, formatDistance } from "../format.js";
+import type { DetailedSegment } from "../types.js";
 
 const { Point, Segment, Track } = BaseBuilder.MODELS;
 
@@ -33,10 +28,8 @@ export function register(server: McpServer): void {
     },
     async ({ segment_id }: { segment_id: number }) => {
       try {
-        const segment = await stravaGet<DetailedSegment>(
-          `/segments/${segment_id}`,
-        );
-        return jsonResult(segment);
+        const { data, meta } = await mirror().segment(String(segment_id));
+        return mirrorResult(data, meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -48,7 +41,7 @@ export function register(server: McpServer): void {
     {
       title: "List Segment Efforts",
       description:
-        "List efforts on a segment, optionally filtered by date range. Returns the authenticated athlete's efforts by default.",
+        "List the authenticated athlete's efforts on a segment, newest first, optionally filtered by date range. Served from the mirror once every activity's efforts are synced.",
       inputSchema: z.object({
         segment_id: z.coerce.number().int().describe("The segment ID"),
         start_date_local: z
@@ -86,16 +79,12 @@ export function register(server: McpServer): void {
       per_page: number;
     }) => {
       try {
-        const efforts = await stravaGet<SegmentEffort[]>(
-          "/segment_efforts",
-          {
-            segment_id,
-            start_date_local,
-            end_date_local,
-            per_page,
-          },
+        const { data: efforts, meta } = await mirror().segmentEfforts(
+          String(segment_id),
+          { start: start_date_local, end: end_date_local },
+          per_page,
         );
-        return jsonResult({ efforts, count: efforts.length });
+        return mirrorResult({ efforts, count: efforts.length }, meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -120,71 +109,8 @@ export function register(server: McpServer): void {
     },
     async ({ effort_id }: { effort_id: string }) => {
       try {
-        const effort = await stravaGet<SegmentEffort>(
-          `/segment_efforts/${effort_id}`,
-        );
-        return jsonResult(effort);
-      } catch (error) {
-        return formatToolError(error);
-      }
-    },
-  );
-
-  server.registerTool(
-    "strava_explore_segments",
-    {
-      title: "Explore Segments",
-      description:
-        'Find popular segments within a geographic bounding box. Provide SW and NE corner coordinates as a comma-separated string: "sw_lat,sw_lng,ne_lat,ne_lng".',
-      inputSchema: z.object({
-        bounds: z
-          .string()
-          .describe(
-            'Bounding box: "south_lat,west_lng,north_lat,east_lng" (e.g. "37.7,-122.5,37.8,-122.4")',
-          ),
-        activity_type: z
-          .enum(["running", "riding"])
-          .optional()
-          .describe('Filter by activity type: "running" or "riding"'),
-        min_cat: z
-          .coerce.number()
-          .int()
-          .min(0)
-          .max(5)
-          .optional()
-          .describe("Minimum climb category (0-5, where 0 is NC and 5 is HC)"),
-        max_cat: z
-          .coerce.number()
-          .int()
-          .min(0)
-          .max(5)
-          .optional()
-          .describe("Maximum climb category (0-5)"),
-      }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
-    },
-    async ({
-      bounds,
-      activity_type,
-      min_cat,
-      max_cat,
-    }: {
-      bounds: string;
-      activity_type?: string;
-      min_cat?: number;
-      max_cat?: number;
-    }) => {
-      try {
-        const result = await stravaGet<{ segments: ExplorerSegment[] }>(
-          "/segments/explore",
-          { bounds, activity_type, min_cat, max_cat },
-        );
-        return jsonResult(result);
+        const { data, meta } = await mirror().segmentEffort(effort_id);
+        return mirrorResult(data, meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -215,10 +141,9 @@ export function register(server: McpServer): void {
       starred: boolean;
     }) => {
       try {
-        const segment = await stravaPut<DetailedSegment>(
-          `/segments/${segment_id}/starred`,
-          { starred },
-        );
+        const m = mirror();
+        const segment = await m.write("PUT", `/segments/${segment_id}/starred`, { starred }, { type: "segment" });
+        await m.engine.enqueue("starred_segments", "self", 5);
         return jsonResult(segment);
       } catch (error) {
         return formatToolError(error);
@@ -244,9 +169,7 @@ export function register(server: McpServer): void {
     },
     async ({ segment_id }: { segment_id: number }) => {
       try {
-        const segment = await stravaGet<DetailedSegment>(
-          `/segments/${segment_id}`,
-        );
+        const segment = (await mirror().segment(String(segment_id))).data as DetailedSegment;
 
         const encoded =
           segment.map.polyline ?? segment.map.summary_polyline;

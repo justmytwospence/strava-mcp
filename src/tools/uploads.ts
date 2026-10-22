@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { stravaGet, stravaPost } from "../strava-client.js";
+import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
 import { jsonResult } from "../format.js";
 import type { Upload } from "../types.js";
@@ -100,6 +101,8 @@ export function register(server: McpServer): void {
         if (external_id) formData.append("external_id", external_id);
 
         const upload = await stravaPost<Upload>("/uploads", formData as unknown as FormData);
+        // The new activity appears in the next listing; ask for one soon.
+        await mirror().engine.enqueue("list_recent", "self", 5);
         return jsonResult(upload);
       } catch (error) {
         return formatToolError(error);

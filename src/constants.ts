@@ -1,4 +1,5 @@
-export const STRAVA_API_BASE = "https://www.strava.com/api/v3";
+// Strava moves the API to https://api-v3.strava.com (available 2027-01-04); override to switch early.
+export const STRAVA_API_BASE = process.env.STRAVA_API_BASE ?? "https://www.strava.com/api/v3";
 export const STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token";
 export const CHARACTER_LIMIT = 25_000;
 export const DEFAULT_PAGE_SIZE = 30;

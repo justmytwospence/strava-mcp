@@ -1,5 +1,5 @@
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
-import { stravaGet } from "../strava-client.js";
+import { mirror } from "../context.js";
 
 export function register(server: McpServer): void {
   server.registerResource(
@@ -12,9 +12,7 @@ export function register(server: McpServer): void {
       mimeType: "application/gpx+xml",
     },
     async (uri, variables) => {
-      const gpx = await stravaGet<string>(
-        `/routes/${variables.routeId}/export_gpx`,
-      );
+      const gpx = String((await mirror().routeExport(String(variables.routeId), "gpx")).data);
       return {
         contents: [
           {

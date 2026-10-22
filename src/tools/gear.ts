@@ -1,9 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { stravaGet } from "../strava-client.js";
+import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
-import { jsonResult } from "../format.js";
-import type { SummaryGear } from "../types.js";
+import { mirrorResult } from "../format.js";
 
 export function register(server: McpServer): void {
   server.registerTool(
@@ -26,8 +25,8 @@ export function register(server: McpServer): void {
     },
     async ({ gear_id }: { gear_id: string }) => {
       try {
-        const gear = await stravaGet<SummaryGear>(`/gear/${gear_id}`);
-        return jsonResult(gear);
+        const { data, meta } = await mirror().gear(gear_id);
+        return mirrorResult(data, meta);
       } catch (error) {
         return formatToolError(error);
       }

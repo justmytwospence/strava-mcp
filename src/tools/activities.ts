@@ -1,18 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { stravaGet, stravaPost, stravaPut } from "../strava-client.js";
+import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
-import { jsonResult } from "../format.js";
+import { jsonResult, mirrorResult, pageOf } from "../format.js";
 import { paginationSchema, formatPaginationNote } from "../pagination.js";
 import { SPORT_TYPES } from "../constants.js";
-import type {
-  SummaryActivity,
-  DetailedActivity,
-  Comment,
-  SummaryAthlete,
-  Lap,
-  ActivityZone,
-} from "../types.js";
+import type { DetailedActivity } from "../types.js";
 
 export function register(server: McpServer): void {
   server.registerTool(
@@ -20,7 +13,7 @@ export function register(server: McpServer): void {
     {
       title: "List Athlete Activities",
       description:
-        "List the authenticated athlete's activities. Supports filtering by date range and pagination.",
+        "List the authenticated athlete's activities, newest first. Supports filtering by date range and pagination. Served from the local mirror (refreshed from Strava at most every 15 minutes).",
       inputSchema: z.object({
         before: z
           .coerce.number()
@@ -53,12 +46,9 @@ export function register(server: McpServer): void {
       per_page: number;
     }) => {
       try {
-        const activities = await stravaGet<SummaryActivity[]>(
-          "/athlete/activities",
-          { before, after, page, per_page },
-        );
+        const { data: activities, meta } = await mirror().listActivities({ before, after, page, perPage: per_page });
         const note = formatPaginationNote(activities.length, page, per_page);
-        return jsonResult({ activities, _pagination: note });
+        return mirrorResult({ activities, _pagination: note }, meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -70,13 +60,13 @@ export function register(server: McpServer): void {
     {
       title: "Get Activity",
       description:
-        "Get detailed information about a specific activity including description, calories, splits, laps, segment efforts, and gear.",
+        "Get detailed information about a specific activity including description, calories, splits, laps, segment efforts, best efforts, and gear. Served from the local mirror; recent activities are refreshed from Strava.",
       inputSchema: z.object({
         activity_id: z.coerce.number().int().describe("The activity ID"),
         include_all_efforts: z
           .boolean()
           .default(false)
-          .describe("Include all segment efforts (can be very large). Default false."),
+          .describe("Kept for compatibility: the mirror stores every segment effort and always returns them all."),
       }),
       annotations: {
         readOnlyHint: true,
@@ -93,11 +83,9 @@ export function register(server: McpServer): void {
       include_all_efforts: boolean;
     }) => {
       try {
-        const activity = await stravaGet<DetailedActivity>(
-          `/activities/${activity_id}`,
-          { include_all_efforts },
-        );
-        return jsonResult(activity);
+        const { data, meta } = await mirror().activity(String(activity_id));
+        void include_all_efforts;
+        return mirrorResult(data, meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -154,10 +142,9 @@ export function register(server: McpServer): void {
       commute?: boolean;
     }) => {
       try {
-        const activity = await stravaPost<DetailedActivity>(
-          "/activities",
-          params,
-        );
+        const m = mirror();
+        const activity = (await m.write("POST", "/activities", params, { type: "activity_detail" })) as DetailedActivity;
+        await m.engine.enqueue("list_recent", "self", 5);
         return jsonResult(activity);
       } catch (error) {
         return formatToolError(error);
@@ -208,10 +195,10 @@ export function register(server: McpServer): void {
       hide_from_home?: boolean;
     }) => {
       try {
-        const activity = await stravaPut<DetailedActivity>(
-          `/activities/${activity_id}`,
-          updates,
-        );
+        const m = mirror();
+        const activity = await m.write("PUT", `/activities/${activity_id}`, updates, { type: "activity_detail" });
+        // The update response may omit efforts; refetch the full detail in the background.
+        await m.engine.enqueue("activity_detail", String(activity_id), 5);
         return jsonResult(activity);
       } catch (error) {
         return formatToolError(error);
@@ -245,12 +232,10 @@ export function register(server: McpServer): void {
       per_page: number;
     }) => {
       try {
-        const comments = await stravaGet<Comment[]>(
-          `/activities/${activity_id}/comments`,
-          { page, per_page },
-        );
+        const { data, meta } = await mirror().activityComments(String(activity_id));
+        const comments = pageOf(data as unknown[], page, per_page);
         const note = formatPaginationNote(comments.length, page, per_page);
-        return jsonResult({ comments, _pagination: note });
+        return mirrorResult({ comments, _pagination: note }, meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -283,12 +268,10 @@ export function register(server: McpServer): void {
       per_page: number;
     }) => {
       try {
-        const kudoers = await stravaGet<SummaryAthlete[]>(
-          `/activities/${activity_id}/kudos`,
-          { page, per_page },
-        );
+        const { data, meta } = await mirror().activityKudos(String(activity_id));
+        const kudoers = pageOf(data as unknown[], page, per_page);
         const note = formatPaginationNote(kudoers.length, page, per_page);
-        return jsonResult({ kudoers, _pagination: note });
+        return mirrorResult({ kudoers, _pagination: note }, meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -313,10 +296,9 @@ export function register(server: McpServer): void {
     },
     async ({ activity_id }: { activity_id: number }) => {
       try {
-        const laps = await stravaGet<Lap[]>(
-          `/activities/${activity_id}/laps`,
-        );
-        return jsonResult(laps);
+        // Laps are part of the activity detail, so this costs no separate request.
+        const { data, meta } = await mirror().activity(String(activity_id));
+        return mirrorResult((data as { laps?: unknown[] }).laps ?? [], meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -341,10 +323,8 @@ export function register(server: McpServer): void {
     },
     async ({ activity_id }: { activity_id: number }) => {
       try {
-        const zones = await stravaGet<ActivityZone[]>(
-          `/activities/${activity_id}/zones`,
-        );
-        return jsonResult(zones);
+        const { data, meta } = await mirror().activityZones(String(activity_id));
+        return mirrorResult(data, meta);
       } catch (error) {
         return formatToolError(error);
       }

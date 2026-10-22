@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { stravaGet } from "../strava-client.js";
+import { mirror } from "../context.js";
 import {
   formatDistance,
   formatDuration,
@@ -54,10 +54,7 @@ export function register(server: McpServer): void {
       const after = Math.floor(start.getTime() / 1000);
       const before = Math.floor(end.getTime() / 1000);
 
-      const activities = await stravaGet<SummaryActivity[]>(
-        "/athlete/activities",
-        { after, before, per_page: 200 },
-      );
+      const activities = (await mirror().listActivities({ after, before, page: 1, perPage: 200 })).data as SummaryActivity[];
 
       const startStr = start.toISOString().split("T")[0];
       const endStr = end.toISOString().split("T")[0];
