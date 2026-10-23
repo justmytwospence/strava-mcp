@@ -248,3 +248,222 @@ column needs a migration in `src/db/schema.ts`.
 ## License
 
 MIT
+
+## Database schema
+
+Entity-relationship diagrams of the DuckDB mirror. Each table shows its primary-key and join columns plus its total column count; joins are logical (DuckDB foreign keys are not declared). Full column comments: the `strava_schema` tool or `DESCRIBE` on the snapshot.
+
+### domain
+
+```mermaid
+erDiagram
+  activity {
+    bigint id PK
+    bigint athlete_id FK
+    varchar gear_id FK
+    _ more "76 columns total"
+  }
+  activity_best_effort {
+    bigint id PK
+    bigint activity_id FK
+    bigint athlete_id FK
+    _ more "14 columns total"
+  }
+  activity_comment {
+    bigint id PK
+    bigint activity_id FK
+    _ more "11 columns total"
+  }
+  activity_kudoer {
+    bigint activity_id PK,FK
+    integer idx PK
+    _ more "5 columns total"
+  }
+  activity_lap {
+    bigint id PK
+    bigint activity_id FK
+    _ more "23 columns total"
+  }
+  activity_photo {
+    varchar unique_id PK
+    bigint activity_id FK
+    _ more "18 columns total"
+  }
+  activity_segment_effort {
+    bigint id PK
+    bigint activity_id FK
+    bigint segment_id FK
+    _ more "25 columns total"
+  }
+  activity_split {
+    bigint activity_id PK,FK
+    varchar units PK
+    integer split PK
+    _ more "12 columns total"
+  }
+  activity_stream_meta {
+    bigint activity_id PK,FK
+    varchar stream_type PK
+    _ more "6 columns total"
+  }
+  activity_stream_point {
+    bigint activity_id PK,FK
+    integer idx PK
+    _ more "14 columns total"
+  }
+  activity_zone {
+    bigint activity_id PK,FK
+    varchar type PK
+    _ more "9 columns total"
+  }
+  activity_zone_bucket {
+    bigint activity_id PK,FK
+    varchar type PK
+    integer bucket_index PK
+    _ more "7 columns total"
+  }
+  athlete {
+    bigint id PK
+    _ more "30 columns total"
+  }
+  athlete_stats {
+    timestamptz fetched_at PK
+    varchar period PK
+    varchar sport PK
+    _ more "11 columns total"
+  }
+  athlete_zone {
+    varchar kind PK
+    integer zone_index PK
+    _ more "6 columns total"
+  }
+  club {
+    bigint id PK
+    _ more "28 columns total"
+  }
+  duckdb_columns {
+    _ more "18 columns total"
+  }
+  duckdb_constraints {
+    _ more "15 columns total"
+  }
+  duckdb_databases {
+    _ more "11 columns total"
+  }
+  duckdb_indexes {
+    _ more "14 columns total"
+  }
+  duckdb_logs {
+    _ more "10 columns total"
+  }
+  duckdb_schemas {
+    _ more "8 columns total"
+  }
+  duckdb_tables {
+    _ more "16 columns total"
+  }
+  duckdb_types {
+    _ more "13 columns total"
+  }
+  duckdb_views {
+    _ more "13 columns total"
+  }
+  gear {
+    varchar id PK
+    _ more "16 columns total"
+  }
+  pragma_database_list {
+    _ more "3 columns total"
+  }
+  route {
+    bigint id PK
+    bigint athlete_id FK
+    _ more "22 columns total"
+  }
+  route_point {
+    bigint route_id PK,FK
+    integer idx PK
+    _ more "6 columns total"
+  }
+  segment {
+    bigint id PK
+    _ more "34 columns total"
+  }
+  segment_effort_stream_point {
+    bigint effort_id PK,FK
+    integer idx PK
+    _ more "14 columns total"
+  }
+  segment_stream_point {
+    bigint segment_id PK,FK
+    integer idx PK
+    _ more "6 columns total"
+  }
+  sqlite_master {
+    _ more "5 columns total"
+  }
+  sqlite_schema {
+    _ more "5 columns total"
+  }
+  sqlite_temp_master {
+    _ more "5 columns total"
+  }
+  sqlite_temp_schema {
+    _ more "5 columns total"
+  }
+  activity ||--o{ activity_best_effort : "activity_id"
+  activity ||--o{ activity_comment : "activity_id"
+  activity ||--o{ activity_kudoer : "activity_id"
+  activity ||--o{ activity_lap : "activity_id"
+  activity ||--o{ activity_photo : "activity_id"
+  activity ||--o{ activity_segment_effort : "activity_id"
+  activity ||--o{ activity_split : "activity_id"
+  activity ||--o{ activity_stream_meta : "activity_id"
+  activity ||--o{ activity_stream_point : "activity_id"
+  activity ||--o{ activity_zone : "activity_id"
+  athlete ||--o{ activity : "athlete_id"
+  gear ||--o{ activity : "gear_id"
+  segment ||--o{ activity_segment_effort : "segment_id"
+  segment ||--o{ segment_stream_point : "segment_id"
+  activity_segment_effort ||--o{ segment_effort_stream_point : "effort_id"
+  route ||--o{ route_point : "route_id"
+  athlete ||--o{ route : "athlete_id"
+  athlete ||--o{ activity_best_effort : "athlete_id"
+  activity_zone ||--o{ activity_zone_bucket : "activity_id"
+```
+
+### raw store and sync
+
+```mermaid
+erDiagram
+  raw_payload {
+    varchar object_type PK
+    varchar object_key PK
+    varchar content_hash PK
+    _ more "5 columns total"
+  }
+  raw_latest {
+    varchar object_type PK
+    varchar object_key PK
+    varchar content_hash FK
+    _ more "6 columns total"
+  }
+  sync_job {
+    varchar kind PK
+    varchar key PK
+    _ more "8 columns total"
+  }
+  sync_log {
+    varchar kind FK
+    _ more "5 columns total"
+  }
+  sync_state {
+    varchar name PK
+    _ more "3 columns total"
+  }
+  rate_sample {
+    _ more "13 columns total"
+  }
+  raw_payload ||--o{ raw_latest : "current version"
+  sync_job ||--o{ sync_log : "outcome of"
+```
