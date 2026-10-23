@@ -13,8 +13,17 @@ import { type Column, type Table, consumedKeys, selectList, table } from "./tabl
 
 const SCOPE = "(SELECT object_key FROM _scope)";
 
+/** raw_current restricted to the scoped keys of one type, with the scope applied to both sides of the join. */
+function scopedRaw(type: string): string {
+  // Not the raw_current view: its scope filter reaches only raw_latest, so the join would
+  // build a hash table over every stored body of the type (gigabytes of streams).
+  return `(SELECT l.object_type, l.object_key, l.status, l.checked_at, p.fetched_at, p.body
+    FROM (SELECT * FROM raw_latest WHERE object_type = '${type}' AND object_key IN ${SCOPE}) l
+    LEFT JOIN (SELECT * FROM raw_payload WHERE object_type = '${type}' AND object_key IN ${SCOPE}) p USING (object_type, object_key, content_hash))`;
+}
+
 function current(type: string, alias = "r"): string {
-  return `(SELECT * FROM raw_current WHERE object_type = '${type}' AND body IS NOT NULL AND object_key IN ${SCOPE}) ${alias}`;
+  return `(SELECT * FROM ${scopedRaw(type)} WHERE body IS NOT NULL) ${alias}`;
 }
 
 function insert(t: Table, from: string, only?: (c: Column) => boolean, conflict = "OR REPLACE"): string {
@@ -146,8 +155,8 @@ const activitySource = `(
       WHEN s.status = 'not_found' OR d.status = 'not_found'
       THEN greatest(CASE WHEN s.status = 'not_found' THEN s.checked_at END, CASE WHEN d.status = 'not_found' THEN d.checked_at END)
     END AS deleted_at
-  FROM (SELECT * FROM raw_current WHERE object_type = 'activity_summary' AND object_key IN ${SCOPE}) s
-  FULL JOIN (SELECT * FROM raw_current WHERE object_type = 'activity_detail' AND object_key IN ${SCOPE}) d
+  FROM ${scopedRaw("activity_summary")} s
+  FULL JOIN ${scopedRaw("activity_detail")} d
     USING (object_key)
 ) src WHERE b IS NOT NULL`;
 

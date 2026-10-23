@@ -28,6 +28,26 @@ function streams(n: number): string {
   });
 }
 
+test("projecting one activity does not read every stored stream payload", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "strava-mem-"));
+  const db = await Database.open({ path: join(dir, "strava.duckdb"), snapshotDir: join(dir, "snapshot") });
+  try {
+    const body = streams(30_000);
+    for (let i = 0; i < 60; i++) await db.transaction((tx) => land(tx, "activity_streams", String(1000 + i), body));
+    await db.close();
+    const small = await Database.open({ path: join(dir, "strava.duckdb"), snapshotDir: join(dir, "snapshot"), memoryLimit: "256MB", threads: 2 });
+    try {
+      await small.transaction((tx) => land(tx, "activity_streams", "999", body));
+      const rows = await small.all("SELECT count(*)::INT AS n FROM activity_stream_point WHERE activity_id = 999");
+      assert.equal(rows[0].n, 30_000);
+    } finally {
+      await small.close();
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("a long activity's streams land under a 256 MB memory limit", async () => {
   const dir = mkdtempSync(join(tmpdir(), "strava-mem-"));
   const db = await Database.open({ path: join(dir, "strava.duckdb"), snapshotDir: join(dir, "snapshot"), memoryLimit: "256MB", threads: 2 });
