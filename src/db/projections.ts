@@ -52,12 +52,23 @@ const STREAM_CASTS: Record<string, string> = {
   grade_smooth: "DOUBLE[]",
 };
 
+const STREAM_KEYS = Object.keys(STREAM_CASTS);
+
 /**
  * Zip the per-channel arrays of a key_by_type streams payload into one row per point.
  * Missing channels unnest to null alongside the present ones.
+ *
+ * Without `bodyFor`, the payload is keyed by type and every channel's data array is pulled
+ * out by one multi-path json_extract: DuckDB parses the JSON afresh for each extraction, and
+ * a long activity's streams (megabytes of JSON, ten channels) otherwise need several
+ * hundred MB.
  */
-function streamPoints(type: string, idColumn: string, keys: string[], bodyFor: (key: string) => string): string {
-  const lists = keys.map((k) => `TRY_CAST(${bodyFor(k)} AS ${STREAM_CASTS[k]}) AS "${k}"`).join(", ");
+function streamPoints(type: string, idColumn: string, keys: string[], bodyFor?: (key: string) => string): string {
+  const source = bodyFor
+    ? current(type)
+    : `(SELECT r.object_key, r.fetched_at, json_extract(r.body, [${keys.map((k) => `'$.${k}.data'`).join(", ")}]) AS __d FROM ${current(type)}) r`;
+  const expr = (k: string) => (bodyFor ? bodyFor(k) : `r.__d[${keys.indexOf(k) + 1}]`);
+  const lists = keys.map((k) => `TRY_CAST(${expr(k)} AS ${STREAM_CASTS[k]}) AS "${k}"`).join(", ");
   const lengths = keys.map((k) => `coalesce(len("${k}"), 0)`).join(", ");
   const unnests = keys
     .map((k) => (k === "latlng" ? `unnest("latlng") AS latlng` : `unnest("${k}") AS "${k}"`))
@@ -65,7 +76,7 @@ function streamPoints(type: string, idColumn: string, keys: string[], bodyFor: (
   const outer = keys.flatMap((k) => (k === "latlng" ? ["latlng[1] AS lat", "latlng[2] AS lng"] : [`"${k}"`])).join(", ");
   return `(SELECT ${idColumn}, fetched_at, idx, ${outer} FROM (
       SELECT ${idColumn}, fetched_at, unnest(range(greatest(${lengths}))) AS idx, ${unnests}
-      FROM (SELECT r.object_key::BIGINT AS ${idColumn}, r.fetched_at, ${lists} FROM ${current(type)})
+      FROM (SELECT r.object_key::BIGINT AS ${idColumn}, r.fetched_at, ${lists} FROM ${source})
     )) s`;
 }
 
@@ -199,14 +210,20 @@ export const PROJECTIONS: Projection[] = [
       `DELETE FROM activity_stream_meta WHERE activity_id IN ${activityIds}`,
       insert(
         streamMeta,
-        `(SELECT r.object_key::BIGINT AS activity_id, r.fetched_at, k AS stream_type, r.body->k AS b
-          FROM ${current("activity_streams")}, unnest(json_keys(r.body)) t(k)
-          WHERE json_type(r.body) = 'OBJECT') src`,
+        // Only the three scalars of each stream, in one extraction: r.body->k would copy
+        // each channel's whole data array (megabytes for a long activity).
+        `(SELECT activity_id, fetched_at, k AS stream_type,
+                 json_object('original_size', m[3 * i + 1], 'resolution', m[3 * i + 2], 'series_type', m[3 * i + 3]) AS b
+          FROM (SELECT r.object_key::BIGINT AS activity_id, r.fetched_at,
+                       json_extract_string(r.body, [${STREAM_KEYS.flatMap((k) => [`'$.${k}.original_size'`, `'$.${k}.resolution'`, `'$.${k}.series_type'`]).join(", ")}]) AS m
+                FROM ${current("activity_streams")} WHERE json_type(r.body) = 'OBJECT'),
+               unnest([${STREAM_KEYS.map((k) => `'${k}'`).join(", ")}]) WITH ORDINALITY AS t(k, o), LATERAL (SELECT (o - 1)::INTEGER AS i)
+          WHERE m[3 * i + 1] IS NOT NULL OR m[3 * i + 3] IS NOT NULL) src`,
       ),
       `DELETE FROM activity_stream_point WHERE activity_id IN ${activityIds}`,
       insert(
         streamPoint,
-        streamPoints("activity_streams", "activity_id", Object.keys(STREAM_CASTS), (k) => `r.body->'${k}'->'data'`),
+        streamPoints("activity_streams", "activity_id", Object.keys(STREAM_CASTS)),
       ),
     ],
     shapes: [
@@ -365,7 +382,7 @@ export const PROJECTIONS: Projection[] = [
     type: "segment_streams",
     statements: [
       `DELETE FROM segment_stream_point WHERE segment_id IN ${activityIds}`,
-      insert(segmentPoint, streamPoints("segment_streams", "segment_id", ["distance", "latlng", "altitude"], (k) => `r.body->'${k}'->'data'`)),
+      insert(segmentPoint, streamPoints("segment_streams", "segment_id", ["distance", "latlng", "altitude"])),
     ],
     shapes: [{ objects: objects("segment_streams"), known: new Set(["distance", "latlng", "altitude"]) }],
   },
@@ -378,7 +395,7 @@ export const PROJECTIONS: Projection[] = [
     type: "segment_effort_streams",
     statements: [
       `DELETE FROM segment_effort_stream_point WHERE effort_id IN ${activityIds}`,
-      insert(effortPoint, streamPoints("segment_effort_streams", "effort_id", Object.keys(STREAM_CASTS), (k) => `r.body->'${k}'->'data'`)),
+      insert(effortPoint, streamPoints("segment_effort_streams", "effort_id", Object.keys(STREAM_CASTS))),
     ],
     shapes: [{ objects: objects("segment_effort_streams"), known: new Set(Object.keys(STREAM_CASTS)) }],
   },
