@@ -16,6 +16,7 @@ import {
   DuckDBInstance,
   type DuckDBValue,
 } from "@duckdb/node-api";
+import { exitOnFatalDatabaseError } from "./fatal.js";
 import { MIGRATIONS } from "./schema.js";
 
 export type Row = Record<string, unknown>;
@@ -107,9 +108,17 @@ export class Database {
     }
   }
 
-  /** Run statements on the writer connection, serialized with every other write. */
+  /**
+   * Run statements on the writer connection, serialized with every other write. An
+   * error that invalidated the database ends the process (see fatal.ts).
+   */
   write<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
-    return this.writeMutex.run(() => fn(new Tx(this.writer)));
+    return this.writeMutex.run(() =>
+      fn(new Tx(this.writer)).catch((err) => {
+        exitOnFatalDatabaseError(err, "mirror");
+        throw err;
+      }),
+    );
   }
 
   /** Run fn in a transaction on the writer connection. */

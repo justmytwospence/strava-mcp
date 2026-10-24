@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { type DuckDBConnection, StatementType } from "@duckdb/node-api";
 import { z } from "zod";
 import { mirror } from "../context.js";
+import { exitOnFatalDatabaseError } from "../db/fatal.js";
 import { drift } from "../db/projections.js";
 import { formatToolError } from "../errors.js";
 import { jsonResult, textResult } from "../format.js";
@@ -32,6 +33,9 @@ export async function runReadOnly(sql: string, maxRows: number): Promise<{ colum
     const reader = await prepared.runAndReadUntil(maxRows + 1);
     const rows = reader.getRowObjectsJson();
     return { columns: reader.columnNames(), rows: rows.slice(0, maxRows), truncated: rows.length > maxRows };
+  } catch (err) {
+    exitOnFatalDatabaseError(err, "query");
+    throw err;
   } finally {
     clearTimeout(timer);
   }
