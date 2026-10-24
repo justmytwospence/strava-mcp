@@ -5,7 +5,8 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "strava-mcp-server": "dist/index.js"
+    "strava-mcp-server": "dist/index.js",
+    "strava-mcp-auth": "dist/auth-cli.js"
   },
   "files": [
     "dist"

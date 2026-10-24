@@ -29,6 +29,16 @@ import { limiter } from "./strava-client.js";
 import { SyncEngine } from "./sync/engine.js";
 import type { Usage } from "./sync/rate-limit.js";
 
+// `auth` runs the one-time authorization instead of the server (docker compose run ... auth).
+if (process.argv[2] === "auth") {
+  const { main } = await import("./auth.js");
+  await main(process.argv.slice(3)).catch((err: unknown) => {
+    console.error(err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });
+  process.exit(0);
+}
+
 validateEnv();
 const unitsFromEnv = applyUnitsFromEnv();
 

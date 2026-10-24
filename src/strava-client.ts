@@ -1,8 +1,7 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
 import { STRAVA_API_BASE, STRAVA_TOKEN_URL } from "./constants.js";
 import { StravaApiError } from "./errors.js";
 import { type Priority, RateLimiter } from "./sync/rate-limit.js";
+import { readTokenFile, writeTokenFile } from "./token-store.js";
 import type { TokenResponse } from "./types.js";
 
 /** Every request goes through this limiter; the sync engine reads its status. */
@@ -69,49 +68,38 @@ let refreshToken = process.env.STRAVA_REFRESH_TOKEN ?? "";
 let refreshPromise: Promise<void> | null = null;
 
 /**
- * Optional token store. Strava can rotate the refresh token on any refresh, which
- * would leave the one in the environment dead after the next restart. With
- * STRAVA_TOKEN_FILE set, the latest pair is written there and preferred at startup.
+ * Optional token store (STRAVA_TOKEN_FILE, see token-store.ts). Strava can rotate the
+ * refresh token on any refresh, which would leave the one in the environment dead
+ * after the next restart, so the stored pair is preferred at startup and rewritten
+ * after every refresh.
  */
 const tokenFile = process.env.STRAVA_TOKEN_FILE;
 
-function loadStoredTokens(): void {
-  if (!tokenFile) return;
-  try {
-    const stored = JSON.parse(readFileSync(tokenFile, "utf8")) as {
-      access_token?: string;
-      refresh_token?: string;
-    };
-    if (stored.refresh_token) {
-      refreshToken = stored.refresh_token;
-      accessToken = stored.access_token ?? "";
-    }
-  } catch {
-    // No store yet (first run) or unreadable: fall back to the environment.
-  }
+const stored = readTokenFile(tokenFile);
+if (stored) {
+  refreshToken = stored.refresh_token;
+  accessToken = stored.access_token;
+}
+
+/** Whether a refresh token is available from the environment or the token file. */
+export function hasRefreshToken(): boolean {
+  return refreshToken !== "";
 }
 
 function saveTokens(data: TokenResponse): void {
   if (!tokenFile) return;
   try {
-    mkdirSync(dirname(tokenFile), { recursive: true });
-    const tmp = `${tokenFile}.tmp`;
-    writeFileSync(
-      tmp,
-      JSON.stringify({
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-        expires_at: data.expires_at,
-      }),
-      { mode: 0o600 },
-    );
-    renameSync(tmp, tokenFile);
+    writeTokenFile(tokenFile, {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: data.expires_at,
+      ...(stored?.scope ? { scope: stored.scope } : {}),
+      ...(stored?.athlete_id ? { athlete_id: stored.athlete_id } : {}),
+    });
   } catch (err) {
     console.error(`Could not write STRAVA_TOKEN_FILE (${tokenFile}):`, err);
   }
 }
-
-loadStoredTokens();
 
 const clientId = process.env.STRAVA_CLIENT_ID ?? "";
 const clientSecret = process.env.STRAVA_CLIENT_SECRET ?? "";
@@ -119,7 +107,7 @@ const clientSecret = process.env.STRAVA_CLIENT_SECRET ?? "";
 async function refreshAccessToken(): Promise<void> {
   if (!refreshToken || !clientId || !clientSecret) {
     throw new Error(
-      "Cannot refresh token. Ensure STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET, and STRAVA_REFRESH_TOKEN are set.",
+      "Cannot refresh the Strava token: set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET, and either run strava-mcp-auth to create the token file or set STRAVA_REFRESH_TOKEN.",
     );
   }
 

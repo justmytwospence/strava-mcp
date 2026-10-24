@@ -18,6 +18,7 @@ import { register as registerReferenceResources } from "./resources/reference.js
 import { mirror } from "./context.js";
 import { register as registerMirrorTools } from "./tools/mirror-tools.js";
 import { setDefaultUnits } from "./format.js";
+import { hasRefreshToken } from "./strava-client.js";
 import type { DetailedAthlete } from "./types.js";
 
 import { register as registerWeeklySummary } from "./prompts/weekly-summary.js";
@@ -36,18 +37,17 @@ export function validateEnv(): void {
   const missing = required.filter((key) => !process.env[key]);
 
   if (missing.length > 0) {
-    console.error(
-      `Missing required environment variables: ${missing.join(", ")}`,
-    );
-    console.error(
-      "Set STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET, STRAVA_ACCESS_TOKEN, and STRAVA_REFRESH_TOKEN.",
-    );
+    console.error(`Missing required environment variables: ${missing.join(", ")}`);
+    console.error("Set STRAVA_CLIENT_ID and STRAVA_CLIENT_SECRET from https://www.strava.com/settings/api.");
     process.exit(1);
   }
 
-  if (!process.env.STRAVA_ACCESS_TOKEN && !process.env.STRAVA_REFRESH_TOKEN) {
+  if (!hasRefreshToken() && !process.env.STRAVA_ACCESS_TOKEN) {
+    const file = process.env.STRAVA_TOKEN_FILE;
     console.error(
-      "At least one of STRAVA_ACCESS_TOKEN or STRAVA_REFRESH_TOKEN must be set.",
+      file
+        ? `No Strava tokens: ${file} has no refresh token and STRAVA_REFRESH_TOKEN is unset. Run strava-mcp-auth once to authorize (docker compose run --rm -p 8765:8765 strava-mcp auth).`
+        : "No Strava tokens: set STRAVA_REFRESH_TOKEN, or set STRAVA_TOKEN_FILE and run strava-mcp-auth once to authorize.",
     );
     process.exit(1);
   }
