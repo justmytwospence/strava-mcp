@@ -1,0 +1,86 @@
+site_name: strava-mcp
+site_description: An MCP server over a complete DuckDB mirror of your Strava account, self-hosted with Docker Compose.
+site_url: https://justmytwospence.github.io/strava-mcp/
+repo_url: https://github.com/justmytwospence/strava-mcp
+repo_name: justmytwospence/strava-mcp
+edit_uri: edit/main/docs/
+copyright: MIT licensed. Not affiliated with Strava.
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep orange
+      accent: deep orange
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Configuration: configuration.md
+  - Authentication: authentication.md
+  - Clients: clients.md
+  - How sync works: sync.md
+  - Data:
+      - The mirror and the snapshot: data/index.md
+      - Schema reference: data/schema.md
+  - Extras:
+      - Grafana, notebooks, backups: extras.md
+  - Operations: operations.md
+  - Reference:
+      - Tools, resources and prompts: reference/tools.md
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+plugins:
+  - search
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/justmytwospence/strava-mcp

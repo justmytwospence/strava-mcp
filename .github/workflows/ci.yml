@@ -7,11 +7,25 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm run build
       - run: npm test
+      # The generated references must match the code they are generated from.
+      - run: npm run docs:gen
+      - run: git diff --exit-code -- docs/reference/tools.md docs/data/schema.md
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - run: docker build -t strava-mcp:ci .
+      - run: docker run --rm --entrypoint strava-mcp-auth -e STRAVA_CLIENT_ID=1 -e STRAVA_CLIENT_SECRET=x strava-mcp:ci --help
+      - run: docker compose config --quiet
+        env:
+          STRAVA_CLIENT_ID: "1"
+          STRAVA_CLIENT_SECRET: x
+          MCP_BEARER_TOKEN: x

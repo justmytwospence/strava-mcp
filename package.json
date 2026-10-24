@@ -18,7 +18,10 @@
     "clean": "rm -rf dist",
     "prepare": "npm run build",
     "start:http": "MCP_TRANSPORT=http node dist/index.js",
-    "test": "tsx --test 'test/**/*.test.ts'"
+    "test": "tsx --test 'test/**/*.test.ts'",
+    "docs:gen": "tsx scripts/gen-tools.ts && tsx scripts/gen-schema.ts",
+    "docs:build": "mkdocs build --strict",
+    "bench": "node scripts/bench-memory.ts"
   },
   "engines": {
     "node": ">=20"
