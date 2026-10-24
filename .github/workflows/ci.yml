@@ -26,7 +26,6 @@ jobs:
       - run: docker run --rm --entrypoint strava-mcp-auth -e STRAVA_CLIENT_ID=1 -e STRAVA_CLIENT_SECRET=x strava-mcp:ci --help
       # Every profile must interpolate with only the required variables set.
       - run: docker compose --profile oauth --profile grafana --profile notebooks --profile backup config --quiet
-        env: {STRAVA_CLIENT_ID: "1", STRAVA_CLIENT_SECRET: x, MCP_BEARER_TOKEN: x}
         env:
           STRAVA_CLIENT_ID: "1"
           STRAVA_CLIENT_SECRET: x
