@@ -120,11 +120,13 @@ export class Mirror {
 
   async listActivities(q: { before?: number; after?: number; page: number; perPage: number }): Promise<Cached<unknown[]>> {
     const meta = await this.freshList();
-    const rows = await this.db.all<{ body: string }>(
-      `SELECT coalesce(s.body, d.body) AS body
+    // Summaries are small and inline; only an activity without one (created through a
+    // tool, not listed yet) needs its detail, which may be chunked.
+    const rows = await this.db.all<{ id: string; body: string | null }>(
+      `SELECT a.id::VARCHAR AS id, p.body
        FROM activity a
-       LEFT JOIN raw_current s ON s.object_type = 'activity_summary' AND s.object_key = a.id::VARCHAR
-       LEFT JOIN raw_current d ON d.object_type = 'activity_detail' AND d.object_key = a.id::VARCHAR
+       LEFT JOIN raw_latest l ON l.object_type = 'activity_summary' AND l.object_key = a.id::VARCHAR
+       LEFT JOIN raw_payload p USING (object_type, object_key, content_hash)
        WHERE a.deleted_at IS NULL
          AND ($1::BIGINT IS NULL OR epoch(a.start_date) < $1)
          AND ($2::BIGINT IS NULL OR epoch(a.start_date) > $2)
@@ -132,7 +134,12 @@ export class Mirror {
        LIMIT $3 OFFSET $4`,
       [q.before ?? null, q.after ?? null, q.perPage, (q.page - 1) * q.perPage],
     );
-    return { data: rows.map((r) => safeJsonParse(r.body)), meta };
+    const data: unknown[] = [];
+    for (const r of rows) {
+      const body = r.body ?? (await this.stored("activity_detail", r.id))?.body;
+      if (body) data.push(safeJsonParse(body));
+    }
+    return { data, meta };
   }
 
   /**

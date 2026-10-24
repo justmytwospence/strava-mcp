@@ -9,47 +9,43 @@
  */
 import { listValue } from "@duckdb/node-api";
 import type { Tx } from "./database.js";
+import { BODY_EXPR, bodyExpr } from "./schema.js";
 import { type Column, type Table, consumedKeys, selectList, table } from "./tables.js";
 
 const SCOPE = "(SELECT object_key FROM _scope)";
 
-/** raw_current restricted to the scoped keys of one type, with the scope applied to both sides of the join. */
+/**
+ * raw_current restricted to the scoped keys of one type. The scope is applied to
+ * raw_latest and raw_payload before the join, and the chunked bodies are read with the
+ * same correlated subquery as the view (schema.ts), which only touches the chunks of the
+ * scoped keys.
+ */
 function scopedRaw(type: string): string {
-  // Not the raw_current view: its scope filter reaches only raw_latest, so the join would
-  // build a hash table over every stored body of the type (gigabytes of streams).
-  return `(SELECT l.object_type, l.object_key, l.status, l.checked_at, p.fetched_at, p.body
+  return `(SELECT l.object_type, l.object_key, l.status, l.checked_at, p.fetched_at, ${BODY_EXPR} AS body
     FROM (SELECT * FROM raw_latest WHERE object_type = '${type}' AND object_key IN ${SCOPE}) l
     LEFT JOIN (SELECT * FROM raw_payload WHERE object_type = '${type}' AND object_key IN ${SCOPE}) p USING (object_type, object_key, content_hash))`;
 }
 
-/**
- * The current body of every object of one type, for whole-type scans (drift, planner).
- * raw_payload is filtered by a semi-join on the small raw_latest, so bodies stream
- * through instead of being collected into a join hash table, as the raw_current view's
- * join does (gigabytes for activity streams).
- */
+/** The current body of a sample of the newest objects of one type, for the drift check. */
 function liveBodies(type: string): string {
   const sample = DRIFT_SAMPLE[type] ?? DRIFT_SAMPLE_DEFAULT;
-  // Uncorrelated IN: a correlated EXISTS becomes a delim join, which buffers its whole
-  // input (bodies included) to find the distinct correlation keys.
-  return `(SELECT p.object_key, p.fetched_at, p.body FROM raw_payload p WHERE p.object_type = '${type}'
-    AND p.content_hash IN (SELECT l.content_hash FROM raw_latest l WHERE l.object_type = '${type}' AND l.status = 'ok'
-      ${sample ? `ORDER BY l.checked_at DESC LIMIT ${sample}` : ""}))`;
+  return `(SELECT l.object_key, p.fetched_at, ${BODY_EXPR} AS body
+    FROM (SELECT * FROM raw_latest WHERE object_type = '${type}' AND status = 'ok' ORDER BY checked_at DESC LIMIT ${sample}) l
+    JOIN raw_payload p USING (object_type, object_key, content_hash))`;
 }
 
 /**
  * How many of the newest payloads of a type the drift check parses. New fields show up
  * in new payloads, and parsing everything is expensive: DuckDB parses a whole vector of
- * rows at once, outside its memory limit, and a parsed payload is many times its text
- * (all stored activity streams would need several GB). Streams get a smaller sample;
- * their keys are fixed by the API.
+ * rows at once, outside its memory limit, and a parsed payload is many times its text.
+ * Streams get a small sample; their keys are fixed by the API.
  */
 const DRIFT_SAMPLE_DEFAULT = 200;
 const DRIFT_SAMPLE: Record<string, number> = {
-  activity_streams: 25,
-  segment_streams: 25,
-  segment_effort_streams: 25,
-  route_streams: 25,
+  activity_streams: 10,
+  segment_streams: 10,
+  segment_effort_streams: 10,
+  route_streams: 10,
 };
 
 function current(type: string, alias = "r"): string {
@@ -58,7 +54,9 @@ function current(type: string, alias = "r"): string {
 
 function insert(t: Table, from: string, only?: (c: Column) => boolean, conflict = "OR REPLACE"): string {
   const { names, exprs } = selectList(t, only);
-  return `INSERT ${conflict} INTO ${t.name} (${names})\n  SELECT\n    ${exprs}\n  FROM ${from}`;
+  // A table without an enforced key has nothing to conflict with: its projection deletes first.
+  const mode = t.keyEnforced === false ? "" : conflict;
+  return `INSERT ${mode} INTO ${t.name} (${names})\n  SELECT\n    ${exprs}\n  FROM ${from}`;
 }
 
 /** Upsert that only overwrites the given columns of an existing row. */
@@ -376,9 +374,8 @@ export const PROJECTIONS: Projection[] = [
         `(SELECT p.fetched_at, t.period, t.sport, p.body->(t.period || '_' || t.sport || '_totals') AS b,
             TRY_CAST(p.body->>'biggest_ride_distance' AS DOUBLE) AS biggest_ride_distance,
             TRY_CAST(p.body->>'biggest_climb_elevation_gain' AS DOUBLE) AS biggest_climb_elevation_gain
-          FROM raw_payload p,
-            (SELECT * FROM (VALUES ('recent'), ('ytd'), ('all')) a(period), (VALUES ('ride'), ('run'), ('swim')) s(sport)) t
-          WHERE p.object_type = 'athlete_stats') src`,
+          FROM (SELECT p.fetched_at, ${bodyExpr("p", "p")} AS body FROM raw_payload p WHERE p.object_type = 'athlete_stats') p,
+            (SELECT * FROM (VALUES ('recent'), ('ytd'), ('all')) a(period), (VALUES ('ride'), ('run'), ('swim')) s(sport)) t) src`,
       ),
     ],
     shapes: [

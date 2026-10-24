@@ -22,7 +22,15 @@ export interface Column {
 export interface Table {
   name: string;
   comment: string;
+  /** Columns that identify a row. Declared as PRIMARY KEY unless keyEnforced is false. */
   primaryKey: string[];
+  /**
+   * False for the large point tables: a DuckDB primary key is an ART index that must be
+   * rewritten at every checkpoint, which for millions of rows takes seconds and hundreds
+   * of megabytes per insert. Their projections delete before inserting, so uniqueness
+   * holds without the constraint.
+   */
+  keyEnforced?: boolean;
   columns: Column[];
 }
 
@@ -316,6 +324,7 @@ function streamPointTable(name: string, idColumn: string, comment: string, chann
     name,
     comment,
     primaryKey: [idColumn, "idx"],
+    keyEnforced: false,
     columns: [
       expr(idColumn, "BIGINT", `Owning ${idColumn.replace(/_id$/, "")} id.`, `s.${idColumn}`),
       expr("idx", "INTEGER", "0-based point index (start_index/end_index of laps and efforts refer to it).", "s.idx"),
@@ -587,6 +596,7 @@ export const TABLES: Table[] = [
     name: "route_point",
     comment: "Route geometry in long form (from /routes/{id}/streams).",
     primaryKey: ["route_id", "idx"],
+    keyEnforced: false,
     columns: [
       expr("route_id", "BIGINT", "Route id.", "s.route_id"),
       expr("idx", "INTEGER", "0-based point index.", "s.idx"),
@@ -609,13 +619,24 @@ function sqlString(s: string): string {
   return `'${s.replace(/'/g, "''")}'`;
 }
 
-export function tableDdl(t: Table): string[] {
-  const cols = t.columns.map((c) => `  "${c.name}" ${c.type}`).join(",\n");
+/** The CREATE TABLE statement for a table, under `name` (defaults to the table's own name). */
+export function createTableSql(t: Table, name = t.name): string {
+  const cols = t.columns.map((c) => `  "${c.name}" ${c.type}`);
+  if (t.keyEnforced !== false) cols.push(`  PRIMARY KEY (${t.primaryKey.map((k) => `"${k}"`).join(", ")})`);
+  return `CREATE TABLE IF NOT EXISTS ${name} (\n${cols.join(",\n")}\n)`;
+}
+
+/** COMMENT ON statements for a table and its columns. */
+export function commentSql(t: Table): string[] {
+  const comment = t.keyEnforced === false ? `${t.comment} Rows are unique by (${t.primaryKey.join(", ")}).` : t.comment;
   return [
-    `CREATE TABLE IF NOT EXISTS ${t.name} (\n${cols},\n  PRIMARY KEY (${t.primaryKey.map((k) => `"${k}"`).join(", ")})\n)`,
-    `COMMENT ON TABLE ${t.name} IS ${sqlString(t.comment)}`,
+    `COMMENT ON TABLE ${t.name} IS ${sqlString(comment)}`,
     ...t.columns.map((c) => `COMMENT ON COLUMN ${t.name}."${c.name}" IS ${sqlString(c.comment)}`),
   ];
+}
+
+export function tableDdl(t: Table): string[] {
+  return [createTableSql(t), ...commentSql(t)];
 }
 
 /** `"col", "col2"` and the matching select list for a table, optionally a subset. */

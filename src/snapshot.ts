@@ -1,14 +1,21 @@
 /**
  * Read-only snapshots of the mirror for other readers (notebooks, dashboards, backups).
  *
- * DuckDB lets only one process open the live file, so after changes the whole
- * database is copied (COPY FROM DATABASE, a consistent copy taken under the write
- * lock) into a new file that atomically replaces the previous snapshot. Readers attach
- * it, locally or over HTTP:
+ * DuckDB lets only one process open the live file, so after changes the mirror is
+ * copied under the write lock into a new file that atomically replaces the previous
+ * snapshot. Readers attach it, locally or over HTTP:
  *
  *   ATTACH 'http://strava-mcp:8000/snapshot.duckdb' AS strava (READ_ONLY);
+ *
+ * The copy is a byte copy of the database file. With the writer mutex held nothing
+ * writes, and after CHECKPOINT the write-ahead log is empty, so the file on disk is
+ * exactly the committed state (DuckDB swaps its header atomically at each checkpoint).
+ * Copying through DuckDB instead (COPY FROM DATABASE) materializes every copied table in
+ * memory until the target checkpoints: the whole mirror for the one-statement form, and
+ * still hundreds of megabytes per table when done table by table.
  */
 import { createReadStream, existsSync, renameSync, rmSync, statSync } from "node:fs";
+import { copyFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import type { Database } from "./db/database.js";
@@ -38,14 +45,13 @@ export class SnapshotPublisher {
   async publish(): Promise<void> {
     const tmp = `${this.path}.tmp`;
     rmSync(tmp, { force: true });
-    const catalog = await this.db.catalog();
+    // One write() call: the writer mutex keeps the sync worker and the tools out while
+    // the log is folded into the file and the file is copied.
     await this.db.write(async (tx) => {
-      await tx.run(`ATTACH '${tmp}' AS snapshot_target`);
-      try {
-        await tx.run(`COPY FROM DATABASE "${catalog}" TO snapshot_target`);
-      } finally {
-        await tx.run("DETACH snapshot_target");
-      }
+      // Refused while another connection (the query tool) has a transaction open; the
+      // caller simply tries again on its next tick.
+      await tx.run("CHECKPOINT");
+      await copyFile(this.db.options.path, tmp);
     });
     renameSync(tmp, this.path);
     this.dirty = false;

@@ -6,8 +6,8 @@
  * connection must not run two statements at once); the read-only `query` tool gets its
  * own connection, which MVCC lets run alongside the writer.
  *
- * File access is locked down once the schema is in place: nothing but the snapshot
- * directory is reachable from SQL, so a `query` cannot read the token file.
+ * File access is locked down once the schema is in place: no file or URL is reachable
+ * from SQL, so a `query` cannot read the token file.
  */
 import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -65,8 +65,7 @@ export class Database {
     }
     const db = new Database(instance, writer, { ...options, path, snapshotDir });
     await db.migrate();
-    // From here on SQL can touch only the snapshot directory, and cannot undo that.
-    await writer.run(`SET allowed_directories = ['${snapshotDir}/']`);
+    // From here on SQL cannot touch files or the network, and cannot undo that.
     await writer.run("SET enable_external_access = false");
     await writer.run("SET lock_configuration = true");
     return db;
@@ -79,16 +78,30 @@ export class Database {
     const applied = new Set(
       (await this.all<{ version: number }>("SELECT version FROM schema_migration")).map((r) => Number(r.version)),
     );
-    for (const [index, statements] of MIGRATIONS.entries()) {
+    for (const [index, migration] of MIGRATIONS.entries()) {
       const version = index + 1;
       if (applied.has(version)) continue;
-      await this.writer.run("BEGIN TRANSACTION");
+      const tx = new Tx(this.writer);
       try {
-        for (const sql of statements) await this.writer.run(sql);
-        await this.writer.run("INSERT INTO schema_migration (version) VALUES ($1)", [version]);
-        await this.writer.run("COMMIT");
+        if (Array.isArray(migration)) {
+          await this.writer.run("BEGIN TRANSACTION");
+          try {
+            for (const step of migration) {
+              if (typeof step === "string") await this.writer.run(step);
+              else await step(tx);
+            }
+            await this.writer.run("INSERT INTO schema_migration (version) VALUES ($1)", [version]);
+            await this.writer.run("COMMIT");
+          } catch (err) {
+            await this.writer.run("ROLLBACK").catch(() => undefined);
+            throw err;
+          }
+        } else {
+          // Commits on its own and tolerates being run again after an interruption.
+          await migration.resumable(tx);
+          await this.writer.run("INSERT INTO schema_migration (version) VALUES ($1)", [version]);
+        }
       } catch (err) {
-        await this.writer.run("ROLLBACK");
         throw new Error(`Migration ${version} failed: ${(err as Error).message}`);
       }
     }
