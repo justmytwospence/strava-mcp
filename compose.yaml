@@ -55,11 +55,13 @@ services:
     depends_on:
       - strava-mcp
     environment:
-      OIDC_ISSUER: "${OIDC_ISSUER:?set OIDC_ISSUER in .env for the oauth profile}"
+      # Required for this profile (agentgateway refuses to start without it); not marked
+      # required here because compose interpolates inactive profiles too.
+      OIDC_ISSUER: "${OIDC_ISSUER:-}"
       OIDC_JWKS_URL: "${OIDC_JWKS_URL:-${OIDC_ISSUER}/jwks.json}"
-      OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:?set OIDC_CLIENT_ID in .env for the oauth profile}"
+      OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:-}"
       OIDC_AUDIENCE: "${OIDC_AUDIENCE:-${OIDC_CLIENT_ID}}"
-      PUBLIC_URL: "${PUBLIC_URL:?set PUBLIC_URL in .env for the oauth profile}"
+      PUBLIC_URL: "${PUBLIC_URL:-}"
       MCP_UPSTREAM: "http://strava-mcp:8000/mcp"
       MCP_BUFFER: ${MCP_BUFFER:-33554432}
     secrets:
