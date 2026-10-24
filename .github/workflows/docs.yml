@@ -16,13 +16,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-python@v7.0.0
+      - uses: astral-sh/setup-uv@v10.3.0
         with:
-          python-version: "3.13"
-          cache: pip
-          cache-dependency-path: requirements-docs.txt
-      - run: pip install -r requirements-docs.txt
-      - run: mkdocs build --strict
+          version: "0.13.1"
+          enable-cache: true
+          cache-dependency-glob: requirements-docs.txt
+      # requirements-docs.txt pins the direct dependencies; the release cooldown holds back
+      # fresh releases of everything they pull in.
+      - run: uvx --with-requirements requirements-docs.txt mkdocs build --strict
+        env:
+          UV_EXCLUDE_NEWER: 7 days
       - uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: site
