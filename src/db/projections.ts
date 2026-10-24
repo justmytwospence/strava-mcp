@@ -22,6 +22,36 @@ function scopedRaw(type: string): string {
     LEFT JOIN (SELECT * FROM raw_payload WHERE object_type = '${type}' AND object_key IN ${SCOPE}) p USING (object_type, object_key, content_hash))`;
 }
 
+/**
+ * The current body of every object of one type, for whole-type scans (drift, planner).
+ * raw_payload is filtered by a semi-join on the small raw_latest, so bodies stream
+ * through instead of being collected into a join hash table, as the raw_current view's
+ * join does (gigabytes for activity streams).
+ */
+function liveBodies(type: string): string {
+  const sample = DRIFT_SAMPLE[type] ?? DRIFT_SAMPLE_DEFAULT;
+  // Uncorrelated IN: a correlated EXISTS becomes a delim join, which buffers its whole
+  // input (bodies included) to find the distinct correlation keys.
+  return `(SELECT p.object_key, p.fetched_at, p.body FROM raw_payload p WHERE p.object_type = '${type}'
+    AND p.content_hash IN (SELECT l.content_hash FROM raw_latest l WHERE l.object_type = '${type}' AND l.status = 'ok'
+      ${sample ? `ORDER BY l.checked_at DESC LIMIT ${sample}` : ""}))`;
+}
+
+/**
+ * How many of the newest payloads of a type the drift check parses. New fields show up
+ * in new payloads, and parsing everything is expensive: DuckDB parses a whole vector of
+ * rows at once, outside its memory limit, and a parsed payload is many times its text
+ * (all stored activity streams would need several GB). Streams get a smaller sample;
+ * their keys are fixed by the API.
+ */
+const DRIFT_SAMPLE_DEFAULT = 200;
+const DRIFT_SAMPLE: Record<string, number> = {
+  activity_streams: 25,
+  segment_streams: 25,
+  segment_effort_streams: 25,
+  route_streams: 25,
+};
+
 function current(type: string, alias = "r"): string {
   return `(SELECT * FROM ${scopedRaw(type)} WHERE body IS NOT NULL) ${alias}`;
 }
@@ -112,7 +142,7 @@ function known(t: Table | Table[], ...extra: string[]): Set<string> {
 }
 
 function objects(type: string, path?: string): string {
-  const inner = `SELECT body FROM raw_current WHERE object_type = '${type}' AND body IS NOT NULL`;
+  const inner = `SELECT body FROM ${liveBodies(type)} WHERE body IS NOT NULL`;
   if (!path) return `SELECT body AS o FROM (${inner}) WHERE json_type(body) = 'OBJECT'`;
   return `SELECT unnest(CAST(json_extract(body, '${path}') AS JSON[])) AS o FROM (${inner})`;
 }
@@ -240,7 +270,7 @@ export const PROJECTIONS: Projection[] = [
       {
         // Key names of each stream object, without extracting the (large) data arrays.
         keys: `SELECT unnest(flatten(list_filter(json_keys(body, [${Object.keys(STREAM_CASTS).map((k) => `'$.${k}'`).join(", ")}]), x -> x IS NOT NULL))) AS k
-               FROM raw_current WHERE object_type = 'activity_streams' AND body IS NOT NULL AND json_type(body) = 'OBJECT'`,
+               FROM ${liveBodies("activity_streams")} WHERE body IS NOT NULL AND json_type(body) = 'OBJECT'`,
         known: known(streamMeta, "data"),
       },
     ],
@@ -331,8 +361,8 @@ export const PROJECTIONS: Projection[] = [
     ],
     shapes: [
       { objects: objects("athlete_zones"), known: new Set(["heart_rate", "power"]) },
-      { objects: `SELECT json_extract(body, '$.heart_rate') AS o FROM raw_current WHERE object_type = 'athlete_zones' AND body IS NOT NULL`, known: new Set(["custom_zones", "zones"]) },
-      { objects: `SELECT json_extract(body, '$.power') AS o FROM raw_current WHERE object_type = 'athlete_zones' AND body IS NOT NULL`, known: new Set(["zones"]) },
+      { objects: `SELECT json_extract(body, '$.heart_rate') AS o FROM ${liveBodies("athlete_zones")} WHERE body IS NOT NULL`, known: new Set(["custom_zones", "zones"]) },
+      { objects: `SELECT json_extract(body, '$.power') AS o FROM ${liveBodies("athlete_zones")} WHERE body IS NOT NULL`, known: new Set(["zones"]) },
       { objects: objects("athlete_zones", "$.heart_rate.zones"), known: known(athleteZone) },
     ],
   },
@@ -359,7 +389,7 @@ export const PROJECTIONS: Projection[] = [
           ...["recent", "ytd", "all"].flatMap((p) => ["ride", "run", "swim"].map((s) => `${p}_${s}_totals`)),
         ]),
       },
-      { objects: `SELECT json_extract(body, '$.recent_run_totals') AS o FROM raw_current WHERE object_type = 'athlete_stats' AND body IS NOT NULL`, known: known(athleteStats) },
+      { objects: `SELECT json_extract(body, '$.recent_run_totals') AS o FROM ${liveBodies("athlete_stats")} WHERE body IS NOT NULL`, known: known(athleteStats) },
     ],
   },
   {
@@ -383,7 +413,7 @@ export const PROJECTIONS: Projection[] = [
       ),
       `UPDATE segment SET starred = false, starred_date = NULL
         WHERE starred AND id NOT IN (
-          SELECT TRY_CAST(o->>'id' AS BIGINT) FROM (SELECT unnest(CAST(body AS JSON[])) AS o FROM raw_current WHERE object_type = 'segment_starred' AND body IS NOT NULL))`,
+          SELECT TRY_CAST(o->>'id' AS BIGINT) FROM (SELECT unnest(CAST(body AS JSON[])) AS o FROM ${liveBodies("segment_starred")} WHERE body IS NOT NULL))`,
     ],
     shapes: [{ objects: objects("segment_starred", "$[*]"), known: known(segment) }],
   },
@@ -414,7 +444,7 @@ export const PROJECTIONS: Projection[] = [
     statements: [
       upsert(route, `(SELECT r.fetched_at, NULL::TIMESTAMPTZ AS detail_fetched_at, unnest(CAST(r.body AS JSON[])) AS b FROM ${current("route_list")}) src`, routeSummary),
       `DELETE FROM route WHERE id NOT IN (
-          SELECT TRY_CAST(o->>'id' AS BIGINT) FROM (SELECT unnest(CAST(body AS JSON[])) AS o FROM raw_current WHERE object_type = 'route_list' AND body IS NOT NULL))`,
+          SELECT TRY_CAST(o->>'id' AS BIGINT) FROM (SELECT unnest(CAST(body AS JSON[])) AS o FROM ${liveBodies("route_list")} WHERE body IS NOT NULL))`,
     ],
     shapes: [{ objects: objects("route_list", "$[*]"), known: known(route) }],
   },

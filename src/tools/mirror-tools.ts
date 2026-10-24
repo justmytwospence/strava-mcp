@@ -37,6 +37,9 @@ export async function runReadOnly(sql: string, maxRows: number): Promise<{ colum
   }
 }
 
+const DRIFT_TTL_MS = 60 * 60_000;
+let driftCache: { at: number; value: Awaited<ReturnType<typeof drift>> } | null = null;
+
 export function register(server: McpServer): void {
   server.registerTool(
     "strava_query",
@@ -123,7 +126,11 @@ export function register(server: McpServer): void {
       try {
         const m = mirror();
         const status = await m.engine.status();
-        const unmapped = await m.db.write((tx) => drift(tx));
+        // The drift check scans stored payloads, so it is reused for an hour.
+        if (!driftCache || Date.now() - driftCache.at > DRIFT_TTL_MS) {
+          driftCache = { at: Date.now(), value: await m.db.write((tx) => drift(tx)) };
+        }
+        const unmapped = driftCache.value;
         return jsonResult({ ...status, unmapped_fields: unmapped });
       } catch (error) {
         return formatToolError(error);
