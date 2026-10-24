@@ -89,7 +89,7 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: motherduck-duckdb-datasource
-      GF_INSTALL_PLUGINS: "https://github.com/motherduckdb/grafana-duckdb-datasource/releases/download/v0.4.5/motherduck-duckdb-datasource-0.4.5.zip;motherduck-duckdb-datasource"
+      GF_INSTALL_PLUGINS: "https://github.com/motherduckdb/grafana-duckdb-datasource/releases/download/v0.4.6/motherduck-duckdb-datasource-0.4.6.zip;motherduck-duckdb-datasource"
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
     volumes:
