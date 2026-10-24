@@ -26,6 +26,9 @@ const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
 
+/** The activity-list poll interval while a webhook subscription is active. */
+const PUSH_LIST_RECENT_EVERY = 6 * HOUR;
+
 export function priorityClass(priority: number): Priority {
   if (priority < 10) return "interactive";
   if (priority < 20) return "incremental";
@@ -41,6 +44,8 @@ interface Job {
 
 /** Periodic tasks: kind, interval, priority. */
 const PERIODIC: Array<{ kind: string; every: number; priority: number }> = [
+  // With a live push subscription, Strava tells us about new activities, and the
+  // listing only runs as a safety net (see PUSH_LIST_RECENT_EVERY).
   { kind: "list_recent", every: 15 * MINUTE, priority: 10 },
   { kind: "athlete", every: 6 * HOUR, priority: 15 },
   { kind: "athlete_stats", every: 6 * HOUR, priority: 15 },
@@ -118,12 +123,20 @@ export class SyncEngine {
   private wake: (() => void) | null = null;
   private current: Job | null = null;
   private stopped: Promise<void> | null = null;
+  private pushActive = false;
+  /** Status of the webhook subscription, for sync_status. */
+  pushStatus: (() => Promise<unknown>) | null = null;
 
   constructor(
     private readonly db: Database,
     private readonly options: EngineOptions = {},
   ) {
     this.fetch = new Fetchers(db);
+  }
+
+  /** Whether Strava pushes activity events to us, which makes frequent polling unnecessary. */
+  setPushActive(active: boolean): void {
+    this.pushActive = active;
   }
 
   async enqueue(kind: string, key: string, priority: number, sortKey = 0): Promise<void> {
@@ -159,7 +172,8 @@ export class SyncEngine {
     const hasActivities = await this.db.one<{ n: number }>("SELECT count(*)::INTEGER AS n FROM activity");
     for (const task of PERIODIC) {
       const last = state.get(`last:${task.kind}`);
-      if (last && Date.now() - Date.parse(last) < task.every) continue;
+      const every = task.kind === "list_recent" && this.pushActive ? PUSH_LIST_RECENT_EVERY : task.every;
+      if (last && Date.now() - Date.parse(last) < every) continue;
       // The first full listing is the start of the backfill, so it runs at incremental priority.
       const priority = task.kind === "list_full" && !hasActivities?.n ? 10 : task.priority;
       await this.enqueue(task.kind, "self", priority);
@@ -396,6 +410,7 @@ export class SyncEngine {
       outcomes_last_24h: recent,
       recent_errors: errors,
       rate_limits: limiter.status(),
+      webhook: this.pushStatus ? await this.pushStatus() : null,
     };
   }
 }

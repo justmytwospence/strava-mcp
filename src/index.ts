@@ -24,6 +24,7 @@ import {
   VERSION,
 } from "./server.js";
 import { SnapshotPublisher } from "./snapshot.js";
+import { StravaWebhook, type WebhookEvent } from "./webhook.js";
 import { limiter } from "./strava-client.js";
 import { SyncEngine } from "./sync/engine.js";
 import type { Usage } from "./sync/rate-limit.js";
@@ -73,6 +74,16 @@ const snapshot = new SnapshotPublisher(db);
 const engine = new SyncEngine(db, { onChange: () => snapshot.markDirty() });
 setMirror(new Mirror(db, engine));
 
+// Push subscription: needs the public callback URL (with a secret path) and HTTP transport.
+const webhookUrl = process.env.STRAVA_WEBHOOK_URL ?? "";
+const webhook = webhookUrl
+  ? new StravaWebhook(db, engine, webhookUrl, {
+      clientId: process.env.STRAVA_CLIENT_ID ?? "",
+      clientSecret: process.env.STRAVA_CLIENT_SECRET ?? "",
+    })
+  : null;
+if (webhook) engine.pushStatus = () => webhook.status();
+
 const syncEnabled = (process.env.STRAVA_SYNC ?? "on").toLowerCase() !== "off";
 if (syncEnabled) {
   engine.start();
@@ -80,6 +91,7 @@ if (syncEnabled) {
 }
 
 async function closeMirror(): Promise<void> {
+  webhook?.stop();
   snapshot.stop();
   await engine.stop();
   db.close();
@@ -139,15 +151,36 @@ if (transport === "stdio") {
     }
     return handler.fetch(c.req.raw, { parsedBody: c.get("parsedBody") });
   };
+  // Strava's webhook callback: public, authenticated by its secret path and the
+  // subscription/athlete checks; events only queue re-fetches.
+  if (webhook) {
+    app.get(webhook.path, (c) => {
+      const r = webhook.validate(new URL(c.req.url).searchParams);
+      return c.json(r.body, r.status as 200 | 403);
+    });
+    app.post(webhook.path, async (c) => {
+      let event: WebhookEvent;
+      try {
+        event = await c.req.json();
+      } catch {
+        return c.text("bad request", 400);
+      }
+      void webhook.handle(event).catch((err) => console.error("strava webhook: event failed:", err));
+      return c.text("ok");
+    });
+  }
   app.all("/mcp", mcp);
   app.all("/", mcp);
 
   const httpServer = serve(
     { fetch: app.fetch, port, hostname: "0.0.0.0" },
-    (info) =>
+    (info) => {
       console.error(
         `${SERVER_NAME} ${VERSION} listening on http://0.0.0.0:${info.port}/mcp (mirror: ${dbPath}, sync ${syncEnabled ? "on" : "off"})`,
-      ),
+      );
+      // Registration makes Strava call the callback, so it waits for the listener.
+      if (webhook && syncEnabled) webhook.start();
+    },
   );
   const shutdown = async () => {
     await handler.close();

@@ -184,6 +184,7 @@ at `http://<host>:8000/mcp` (also at `/`), with a health check at `/health`, and
 | `STRAVA_DB_PATH` | `./state/strava.duckdb` (`/data/strava.duckdb` in the image) | The mirror; mount a volume |
 | `STRAVA_SNAPSHOT_DIR` | `snapshot/` next to the mirror | Where read-only snapshots are published |
 | `SNAPSHOT_TOKEN` | (unset: not served) | Bearer token for `GET /snapshot.duckdb` |
+| `STRAVA_WEBHOOK_URL` | (unset: poll every 15 min) | Public HTTPS callback for Strava push events, with a secret path (e.g. `https://host/webhook/<random>`). The server registers the app's subscription at startup; new, edited and deleted activities are then queued within seconds, and the activity list is only polled every 6 hours as a safety net. Events only queue re-fetches from the API. HTTP transport only |
 | `MCP_BEARER_TOKEN` | (unset: open) | Require this bearer token on `/mcp` (e.g. from an auth proxy) |
 | `STRAVA_SYNC` | `on` | `off` serves from the mirror and fetches on demand, without background sync |
 | `STRAVA_API_BASE` | `https://www.strava.com/api/v3` | Strava moves the API to `https://api-v3.strava.com` (available 2027-01-04) |
