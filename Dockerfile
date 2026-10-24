@@ -2,12 +2,16 @@
 
 FROM node:24-alpine AS build
 WORKDIR /app
-COPY package.json package-lock.json ./
-# --ignore-scripts: `prepare` builds, and the sources are not copied in yet.
-RUN npm ci --ignore-scripts
+# pnpm at the version and checksum package.json's packageManager names.
+ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# The install re-checks every lockfile entry against the release cooldown in
+# pnpm-workspace.yaml. --ignore-scripts: `prepare` builds, and the sources are not copied in yet.
+RUN pnpm install --frozen-lockfile --ignore-scripts
 COPY tsconfig.json ./
 COPY src ./src
-RUN npm run build && npm prune --omit=dev
+RUN pnpm run build && pnpm prune --prod --ignore-scripts
 
 FROM node:24-alpine
 # Memory: DuckDB keeps its buffers under DUCKDB_MEMORY_LIMIT, and the process needs

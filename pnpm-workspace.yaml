@@ -1,0 +1,12 @@
+# Release cooldown: a version installs only once it is a week old (10080 minutes), for every
+# dependency, and every install (CI and the Docker build included) re-checks the lockfile
+# against it. To take one requested release early, add `<pkg>@<version>` under
+# minimumReleaseAgeExclude; the entry covers that version only and is pruned once the
+# lockfile no longer uses it.
+minimumReleaseAge: 10080
+minimumReleaseAgeIgnoreMissingTime: false
+minimumReleaseAgeExcludePrune: true
+# No dependency runs install scripts (the Docker build and CI used `npm ci --ignore-scripts`).
+# esbuild's only checks its platform binary, which it ships as an optional dependency.
+allowBuilds:
+  esbuild: false

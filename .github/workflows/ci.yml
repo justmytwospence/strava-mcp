@@ -8,15 +8,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
+      # pnpm at package.json's packageManager version; the install re-checks the lockfile
+      # against the release cooldown in pnpm-workspace.yaml.
+      - uses: pnpm/action-setup@v6.1.0
       - uses: actions/setup-node@v7.0.0
         with:
           node-version: 24
-          cache: npm
-      - run: npm ci --ignore-scripts
-      - run: npm run build
-      - run: npm test
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm run build
+      - run: pnpm test
       # The generated references must match the code they are generated from.
-      - run: npm run docs:gen
+      - run: pnpm run docs:gen
       - run: git diff --exit-code -- docs/reference/tools.md docs/data/schema.md
   image:
     runs-on: ubuntu-latest

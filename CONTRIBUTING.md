@@ -4,24 +4,26 @@ Thanks for looking into strava-mcp. Bug reports, questions and pull requests are
 
 ## Setup
 
-Node 24 (the image), Node 22 works for development.
+Node 24 (the image), Node 22 works for development, and pnpm at the version `packageManager` in `package.json` names (`corepack enable` provides it).
 
 ```sh
-npm install
-npm run dev          # tsx watch src/index.ts (stdio transport)
-npm run build        # tsc into dist/
-npm test             # node:test through tsx, about a minute
-npx tsc --noEmit     # type check only
+pnpm install
+pnpm run dev         # tsx watch src/index.ts (stdio transport)
+pnpm run build       # tsc into dist/
+pnpm test            # node:test through tsx, about a minute
+pnpm exec tsc --noEmit  # type check only
 ```
+
+Dependencies follow a seven-day release cooldown: pnpm installs a version only once it is a week old (`minimumReleaseAge` in `pnpm-workspace.yaml`), and every install, CI and the Docker build included, re-checks the lockfile against it. To take one release early, add `<package>@<version>` under `minimumReleaseAgeExclude` in the same change; it covers that version only. No dependency runs install scripts (`allowBuilds`).
 
 To run the HTTP server locally with a throw-away mirror and no sync:
 
 ```sh
 STRAVA_CLIENT_ID=x STRAVA_CLIENT_SECRET=x STRAVA_REFRESH_TOKEN=x STRAVA_SYNC=off \
-MCP_TRANSPORT=http STRAVA_DB_PATH=/tmp/strava-dev/strava.duckdb npm start
+MCP_TRANSPORT=http STRAVA_DB_PATH=/tmp/strava-dev/strava.duckdb pnpm start
 ```
 
-With real credentials, `STRAVA_TOKEN_FILE=./state/tokens.json npx tsx src/auth-cli.ts` authorizes against your own API application; the mirror then fills in `./state/`.
+With real credentials, `STRAVA_TOKEN_FILE=./state/tokens.json pnpm exec tsx src/auth-cli.ts` authorizes against your own API application; the mirror then fills in `./state/`.
 
 ## Layout
 
@@ -50,8 +52,8 @@ With real credentials, `STRAVA_TOKEN_FILE=./state/tokens.json npx tsx src/auth-c
 1. Add it to the table's column list in `src/db/tables.ts`: `col("name", "TYPE", "Description with unit.")` reads the JSON key of the same name; `expr(...)` takes any SQL over `b` (the JSON object) and names the key it consumes, so the drift check knows the key is mapped.
 2. Append a migration in `src/db/schema.ts` (`ALTER TABLE ... ADD COLUMN ...` plus `COMMENT ON COLUMN`). Never edit a shipped migration.
 3. Backfill from the raw store: a reprojection of the type (`project(tx, type, null)`) can be a migration step for small types; for large ones leave the column null until payloads are refreshed.
-4. `npm test`: the schema test fails if the live columns differ from the definition, and the drift test if a fixture key is left unmapped. Extend `test/fixtures/payloads.json` with scrubbed data if the field is not in it (no real ids, names or coordinates).
-5. `npm run docs:gen` and commit `docs/data/schema.md`.
+4. `pnpm test`: the schema test fails if the live columns differ from the definition, and the drift test if a fixture key is left unmapped. Extend `test/fixtures/payloads.json` with scrubbed data if the field is not in it (no real ids, names or coordinates).
+5. `pnpm run docs:gen` and commit `docs/data/schema.md`.
 
 ## Adding a table or a payload type
 
@@ -59,14 +61,14 @@ A new raw type needs a fetcher in `src/sync/fetchers.ts`, a projection in `src/d
 
 ## Generated documentation
 
-`docs/reference/tools.md` and `docs/data/schema.md` are generated: `npm run build && npm run docs:gen`. CI regenerates them and fails when the committed files differ. The site builds with `uvx --from mkdocs-material==9.7.7 mkdocs build --strict` (or `pip install -r requirements-docs.txt && mkdocs build --strict`); `mkdocs serve` previews it.
+`docs/reference/tools.md` and `docs/data/schema.md` are generated: `pnpm run build && pnpm run docs:gen`. CI regenerates them and fails when the committed files differ. The site builds with `UV_EXCLUDE_NEWER="7 days" uvx --with-requirements requirements-docs.txt mkdocs build --strict`, as CI does; `mkdocs serve` previews it.
 
 ## Memory benchmark
 
 `scripts/bench-memory.ts` measures the peak resident memory of one operation (open, drift, plan, project-streams, read-streams, snapshot) in a fresh process, on a copy of a mirror. Run it on the compiled code, ideally inside the image, since that is what ships:
 
 ```sh
-npm run build
+pnpm run build
 cp /path/to/strava.duckdb /tmp/bench.duckdb
 DUCKDB_MEMORY_LIMIT=384MB node scripts/bench-memory.ts drift /tmp/bench.duckdb
 docker build -t strava-mcp:bench . && docker run --rm --entrypoint node \
@@ -85,4 +87,4 @@ Opening a 3.x mirror runs the migration, so `open` on such a copy measures it.
 
 ## Releasing
 
-Bump `package.json`, add the version to `CHANGELOG.md`, commit `chore: release X.Y.Z`, tag `vX.Y.Z` and push the tag. The release workflow builds and pushes the image for amd64 and arm64 with the `X.Y.Z`, `X.Y` and `X` tags; `npm publish` publishes the package.
+Bump `package.json`, add the version to `CHANGELOG.md`, commit `chore: release X.Y.Z`, tag `vX.Y.Z` and push the tag. The release workflow builds and pushes the image for amd64 and arm64 with the `X.Y.Z`, `X.Y` and `X` tags; `pnpm publish` publishes the package.

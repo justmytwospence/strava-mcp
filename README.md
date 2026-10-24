@@ -49,10 +49,10 @@ The [quickstart](https://justmytwospence.github.io/strava-mcp/quickstart/) walks
 ## Development
 
 ```sh
-npm install
-npm test             # the mirror against scrubbed payloads, chunked storage, migrations, snapshots, the limiter, the webhook, the auth command
-npm run build
-npm run docs:gen     # regenerate docs/reference/tools.md and docs/data/schema.md
+pnpm install
+pnpm test            # the mirror against scrubbed payloads, chunked storage, migrations, snapshots, the limiter, the webhook, the auth command
+pnpm run build
+pnpm run docs:gen    # regenerate docs/reference/tools.md and docs/data/schema.md
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout, how to add a column or a table, and how the memory benchmark works. Images are published to `ghcr.io/justmytwospence/strava-mcp` for amd64 and arm64 by pushing a `vX.Y.Z` tag.
