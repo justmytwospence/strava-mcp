@@ -1,0 +1,674 @@
+{
+  "uid": "strava-mcp",
+  "title": "Strava",
+  "description": "Training volume, trends and sync health from the strava-mcp mirror snapshot. Times are the activities' local wall-clock times (the dashboard is pinned to UTC so they display as recorded).",
+  "tags": [
+    "strava",
+    "strava-mcp"
+  ],
+  "timezone": "utc",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "",
+  "time": {
+    "from": "now-6M",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Training",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Hours per week by sport",
+      "description": "Moving time per ISO week, stacked by sport type.",
+      "datasource": {
+        "type": "motherduck-duckdb-datasource",
+        "uid": "strava-duckdb"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "motherduck-duckdb-datasource",
+            "uid": "strava-duckdb"
+          },
+          "rawSql": "SELECT date_trunc('week', start_date_local) AS time, sport_type, round(sum(moving_time) / 3600.0, 2) AS hours\nFROM activity\nWHERE deleted_at IS NULL AND $__timeFilter(start_date)\nGROUP BY 1, 2\nORDER BY 1",
+          "format": 0,
+          "rawQuery": true,
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "barWidthFactor": 0.9
+          },
+          "unit": "h"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Distance and elevation per week",
+      "description": "Kilometres (left axis) and metres of elevation gain (right axis) per week, all sports.",
+      "datasource": {
+        "type": "motherduck-duckdb-datasource",
+        "uid": "strava-duckdb"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "motherduck-duckdb-datasource",
+            "uid": "strava-duckdb"
+          },
+          "rawSql": "SELECT date_trunc('week', start_date_local) AS time,\n       round(sum(distance) / 1000, 1) AS distance_km,\n       round(sum(total_elevation_gain)) AS elevation_m\nFROM activity\nWHERE deleted_at IS NULL AND $__timeFilter(start_date)\nGROUP BY 1\nORDER BY 1",
+          "format": 0,
+          "rawQuery": true,
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "distance_km"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "lengthkm"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "elevation_m"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "lengthm"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Average heart rate per activity",
+      "description": "One point per activity with heart-rate data, by sport type.",
+      "datasource": {
+        "type": "motherduck-duckdb-datasource",
+        "uid": "strava-duckdb"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "motherduck-duckdb-datasource",
+            "uid": "strava-duckdb"
+          },
+          "rawSql": "SELECT start_date AS time, sport_type, round(average_heartrate) AS avg_hr\nFROM activity\nWHERE deleted_at IS NULL AND average_heartrate IS NOT NULL AND $__timeFilter(start_date)\nORDER BY 1",
+          "format": 0,
+          "rawQuery": true,
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 5,
+            "showPoints": "always",
+            "lineWidth": 0
+          },
+          "unit": "bpm"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Weekly pace and speed",
+      "description": "Running pace (min/km, left) and riding speed (km/h, right): weekly moving time over distance.",
+      "datasource": {
+        "type": "motherduck-duckdb-datasource",
+        "uid": "strava-duckdb"
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "motherduck-duckdb-datasource",
+            "uid": "strava-duckdb"
+          },
+          "rawSql": "SELECT date_trunc('week', start_date_local) AS time,\n       round(sum(moving_time) / nullif(sum(distance), 0) * 1000 / 60, 2) AS min_per_km\nFROM activity\nWHERE deleted_at IS NULL AND sport_type IN ('Run', 'TrailRun', 'VirtualRun') AND distance > 0 AND $__timeFilter(start_date)\nGROUP BY 1\nORDER BY 1",
+          "format": 0,
+          "rawQuery": true,
+          "editorMode": "code"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "motherduck-duckdb-datasource",
+            "uid": "strava-duckdb"
+          },
+          "rawSql": "SELECT date_trunc('week', start_date_local) AS time,\n       round(sum(distance) / nullif(sum(moving_time), 0) * 3.6, 2) AS km_h\nFROM activity\nWHERE deleted_at IS NULL AND sport_type IN ('Ride', 'GravelRide', 'MountainBikeRide', 'VirtualRide', 'EBikeRide') AND distance > 0 AND $__timeFilter(start_date)\nGROUP BY 1\nORDER BY 1",
+          "format": 0,
+          "rawQuery": true,
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "spanNulls": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "min_per_km"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Run pace (min/km)"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "km_h"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Ride speed (km/h)"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "table",
+      "title": "Recent activities",
+      "description": "The newest activities in the selected time range.",
+      "datasource": {
+        "type": "motherduck-duckdb-datasource",
+        "uid": "strava-duckdb"
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 19
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "motherduck-duckdb-datasource",
+            "uid": "strava-duckdb"
+          },
+          "rawSql": "SELECT start_date_local AS start, name, sport_type AS sport,\n       round(distance / 1000, 1) AS km, moving_time AS moving, round(total_elevation_gain) AS elev_m,\n       round(average_heartrate) AS avg_hr, kudos_count AS kudos\nFROM activity\nWHERE deleted_at IS NULL AND $__timeFilter(start_date)\nORDER BY start_date DESC\nLIMIT 50",
+          "format": 1,
+          "rawQuery": true,
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "moving"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "start"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "name"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 320
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": []
+      }
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "Sync health",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "panels": []
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "Mirror coverage",
+      "description": "What the mirror holds and what the sync worker still has queued (as of the last snapshot).",
+      "datasource": {
+        "type": "motherduck-duckdb-datasource",
+        "uid": "strava-duckdb"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "motherduck-duckdb-datasource",
+            "uid": "strava-duckdb"
+          },
+          "rawSql": "SELECT\n  (SELECT count(*) FROM activity WHERE deleted_at IS NULL) AS activities,\n  (SELECT count(*) FROM activity WHERE deleted_at IS NULL AND detail_fetched_at IS NOT NULL) AS with_detail,\n  (SELECT count(*) FROM raw_latest WHERE object_type = 'activity_streams' AND status = 'ok') AS with_streams,\n  (SELECT count(*) FROM sync_job) AS queued_jobs,\n  (SELECT count(*) FROM sync_job WHERE attempts > 0) AS retrying_jobs,\n  (SELECT max(logged_at) FROM sync_log) AS last_sync_activity",
+          "format": 1,
+          "rawQuery": true,
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {},
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "last_sync_activity"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Sync outcomes per hour",
+      "description": "Jobs run by the worker, by outcome (ok, changed, not_found, error, rate_limited).",
+      "datasource": {
+        "type": "motherduck-duckdb-datasource",
+        "uid": "strava-duckdb"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 36
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "motherduck-duckdb-datasource",
+            "uid": "strava-duckdb"
+          },
+          "rawSql": "SELECT time_bucket(INTERVAL '1 hour', logged_at) AS time, outcome, count(*) AS n\nFROM sync_log\nWHERE $__timeFilter(logged_at)\nGROUP BY 1, 2\nORDER BY 1",
+          "format": 0,
+          "rawQuery": true,
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "lineWidth": 0,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "error"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Strava API usage",
+      "description": "Read requests counted against the daily and 15-minute limits, from the rate-limit headers.",
+      "datasource": {
+        "type": "motherduck-duckdb-datasource",
+        "uid": "strava-duckdb"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 36
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "motherduck-duckdb-datasource",
+            "uid": "strava-duckdb"
+          },
+          "rawSql": "SELECT observed_at AS time, read_usage_daily AS reads_today, read_limit_daily AS daily_limit, read_usage_15min AS reads_15min\nFROM rate_sample\nWHERE read_limit_daily IS NOT NULL AND $__timeFilter(observed_at)\nORDER BY 1",
+          "format": 0,
+          "rawQuery": true,
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "spanNulls": true
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "daily_limit"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed",
+                  "fixedColor": "red"
+                }
+              },
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "table",
+      "title": "Recent sync errors",
+      "description": "Failed jobs and their messages; they are retried with backoff.",
+      "datasource": {
+        "type": "motherduck-duckdb-datasource",
+        "uid": "strava-duckdb"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "motherduck-duckdb-datasource",
+            "uid": "strava-duckdb"
+          },
+          "rawSql": "SELECT logged_at, kind, key, left(detail, 160) AS detail\nFROM sync_log\nWHERE outcome = 'error' AND $__timeFilter(logged_at)\nORDER BY logged_at DESC\nLIMIT 20",
+          "format": 1,
+          "rawQuery": true,
+          "editorMode": "code"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "sortBy": []
+      }
+    }
+  ]
+}

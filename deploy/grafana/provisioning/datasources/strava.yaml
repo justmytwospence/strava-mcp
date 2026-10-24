@@ -1,0 +1,12 @@
+# The DuckDB datasource over the published snapshot. The file is opened read-only (the
+# data volume is mounted read-only) and reopened whenever the server replaces it.
+apiVersion: 1
+datasources:
+  - name: Strava
+    uid: strava-duckdb
+    type: motherduck-duckdb-datasource
+    access: proxy
+    isDefault: true
+    editable: false
+    jsonData:
+      path: /data/snapshot/strava.duckdb?access_mode=read_only

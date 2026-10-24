@@ -1,0 +1,35 @@
+# agentgateway as an OAuth 2.1 resource server in front of strava-mcp (compose profile
+# "oauth"). Dollar-prefixed variables are expanded by agentgateway from the container
+# environment when the file is loaded, everywhere in this file including comments, and
+# an unset one is fatal: compose sets them all from the environment file.
+#
+# Flow: an MCP client reads the protected-resource metadata, signs in at OIDC_ISSUER,
+# and sends a JWT access token. The gateway verifies its signature against
+# OIDC_JWKS_URL, its issuer, and its audience (OIDC_AUDIENCE, by default the client id),
+# then forwards the request to strava-mcp with the server's own bearer token.
+gateways:
+  default:
+    port: 3000
+frontendPolicies:
+  http:
+    maxBufferSize: $MCP_BUFFER
+mcp:
+  targets:
+    - name: strava
+      mcp:
+        host: $MCP_UPSTREAM
+      policies:
+        backendAuth:
+          key:
+            file: /run/secrets/backend-token
+  policies:
+    mcpAuthentication:
+      issuer: $OIDC_ISSUER
+      jwks:
+        url: $OIDC_JWKS_URL
+      audiences: [$OIDC_AUDIENCE]
+      clientId: $OIDC_CLIENT_ID
+      resourceMetadata:
+        resource: $PUBLIC_URL/mcp
+        scopesSupported: [openid, profile, offline_access]
+        bearerMethodsSupported: [header]

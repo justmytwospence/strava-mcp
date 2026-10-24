@@ -1,25 +1,143 @@
-# Self-host strava-mcp: `cp .env.example .env`, fill it in, `docker compose up -d`.
-# The MCP endpoint is then http://<host>:8000/mcp (Streamable HTTP).
+# strava-mcp: an MCP server over a complete DuckDB mirror of your Strava account.
+#
+#   cp .env.example .env         # fill in STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET, MCP_BEARER_TOKEN
+#   docker compose run --rm -p 8765:8765 strava-mcp auth    # one-time Strava authorization
+#   docker compose up -d         # the server alone: http://<host>:8000/mcp
+#
+# Optional, self-contained profiles (docker compose --profile <name> up -d):
+#   oauth      agentgateway in front of /mcp as an OAuth 2.1 resource server (any OIDC provider)
+#   grafana    Grafana with the DuckDB datasource and a provisioned dashboard over the snapshot
+#   notebooks  a marimo notebook over the snapshot
+#   backup     nightly archives of the tokens and the snapshot into ./backups
+# Every variable is described in .env.example; the docs are at https://justmytwospence.github.io/strava-mcp/
+
 services:
   strava-mcp:
-    image: ghcr.io/justmytwospence/strava-mcp:3
+    image: ghcr.io/justmytwospence/strava-mcp:4
     restart: unless-stopped
     environment:
-      STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID:?set STRAVA_CLIENT_ID in .env}
-      STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET:?set STRAVA_CLIENT_SECRET in .env}
-      STRAVA_REFRESH_TOKEN: ${STRAVA_REFRESH_TOKEN:?set STRAVA_REFRESH_TOKEN in .env}
+      STRAVA_CLIENT_ID: "${STRAVA_CLIENT_ID:?set STRAVA_CLIENT_ID in .env, from https://www.strava.com/settings/api}"
+      STRAVA_CLIENT_SECRET: "${STRAVA_CLIENT_SECRET:?set STRAVA_CLIENT_SECRET in .env}"
+      # Optional: a refresh token from your own OAuth flow. Not needed after `strava-mcp auth`.
+      STRAVA_REFRESH_TOKEN: ${STRAVA_REFRESH_TOKEN:-}
       STRAVA_ACCESS_TOKEN: ${STRAVA_ACCESS_TOKEN:-}
-      STRAVA_UNITS: ${STRAVA_UNITS:-}
-      # Hostnames clients use to reach the server, e.g. behind a reverse proxy.
-      # Requests naming any other Host are refused (DNS-rebinding protection).
-      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-}
-      # Optional: serve the read-only snapshot at /snapshot.duckdb to this bearer token.
+      MCP_BEARER_TOKEN: "${MCP_BEARER_TOKEN:?set MCP_BEARER_TOKEN in .env, for example from openssl rand -hex 32}"
       SNAPSHOT_TOKEN: ${SNAPSHOT_TOKEN:-}
-    # The mirror, its snapshots and the rotated OAuth tokens.
+      STRAVA_UNITS: ${STRAVA_UNITS:-}
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-}
+      STRAVA_WEBHOOK_URL: ${STRAVA_WEBHOOK_URL:-}
+      STRAVA_SYNC: ${STRAVA_SYNC:-on}
+      STRAVA_API_BASE: "${STRAVA_API_BASE:-https://www.strava.com/api/v3}"
+      DUCKDB_MEMORY_LIMIT: ${DUCKDB_MEMORY_LIMIT:-384MB}
+      DUCKDB_THREADS: ${DUCKDB_THREADS:-2}
     volumes:
+      # The mirror (strava.duckdb), its snapshot (snapshot/strava.duckdb) and tokens.json.
       - strava-data:/data
     ports:
-      - "8000:8000"
+      - "${STRAVA_MCP_PORT:-8000}:8000"
+    deploy:
+      resources:
+        limits:
+          # Measured: under 500 MB on a 2,000-activity mirror with DUCKDB_MEMORY_LIMIT=384MB.
+          # The first start after upgrading from 3.x converts the mirror and needs more;
+          # see the operations guide.
+          memory: ${STRAVA_MCP_MEMORY:-1g}
+
+  # --- profile: oauth -------------------------------------------------------------------
+  # OAuth 2.1 resource server in front of /mcp: validates JWTs from your OIDC provider,
+  # publishes /.well-known/oauth-protected-resource, and forwards to the server with the
+  # backend bearer. Put your TLS reverse proxy in front of port 3000 at PUBLIC_URL.
+  oauth:
+    image: cr.agentgateway.dev/agentgateway:v1.6.0
+    profiles: [oauth]
+    restart: unless-stopped
+    command: ["-f", "/etc/agentgateway/config.yaml"]
+    depends_on:
+      - strava-mcp
+    environment:
+      OIDC_ISSUER: "${OIDC_ISSUER:?set OIDC_ISSUER in .env for the oauth profile}"
+      OIDC_JWKS_URL: "${OIDC_JWKS_URL:-${OIDC_ISSUER}/jwks.json}"
+      OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:?set OIDC_CLIENT_ID in .env for the oauth profile}"
+      OIDC_AUDIENCE: "${OIDC_AUDIENCE:-${OIDC_CLIENT_ID}}"
+      PUBLIC_URL: "${PUBLIC_URL:?set PUBLIC_URL in .env for the oauth profile}"
+      MCP_UPSTREAM: "http://strava-mcp:8000/mcp"
+      MCP_BUFFER: ${MCP_BUFFER:-33554432}
+    secrets:
+      - source: mcp-bearer-token
+        target: /run/secrets/backend-token
+    volumes:
+      - ./deploy/oauth/agentgateway.yaml:/etc/agentgateway/config.yaml:ro
+    ports:
+      - "${OAUTH_PORT:-3000}:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+
+  # --- profile: grafana -----------------------------------------------------------------
+  # Grafana with the DuckDB datasource (MotherDuck's plugin, unsigned, needs the Ubuntu
+  # image) reading the snapshot from the data volume, plus a provisioned dashboard.
+  grafana:
+    image: grafana/grafana:13.2.4-ubuntu
+    profiles: [grafana]
+    restart: unless-stopped
+    depends_on:
+      - strava-mcp
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: motherduck-duckdb-datasource
+      GF_INSTALL_PLUGINS: "https://github.com/motherduckdb/grafana-duckdb-datasource/releases/download/v0.4.5/motherduck-duckdb-datasource-0.4.5.zip;motherduck-duckdb-datasource"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - strava-data:/data:ro
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+
+  # --- profile: notebooks ---------------------------------------------------------------
+  # A marimo notebook served read-only (marimo run) over the snapshot.
+  notebooks:
+    image: ghcr.io/marimo-team/marimo:0.24.0-sql
+    profiles: [notebooks]
+    restart: unless-stopped
+    depends_on:
+      - strava-mcp
+    command: ["marimo", "run", "--host", "0.0.0.0", "--port", "8080", "--headless", "--no-token", "/notebooks/strava.py"]
+    environment:
+      STRAVA_SNAPSHOT: /data/snapshot/strava.duckdb
+    volumes:
+      - strava-data:/data:ro
+      - ./deploy/notebooks:/notebooks:ro
+    ports:
+      - "${MARIMO_PORT:-2718}:8080"
+
+  # --- profile: backup ------------------------------------------------------------------
+  # Archives of tokens.json and the snapshot (never the live strava.duckdb, which the
+  # server has open) into ./backups on a schedule, pruned by age.
+  backup:
+    image: offen/docker-volume-backup:v2.49.1
+    profiles: [backup]
+    restart: unless-stopped
+    environment:
+      BACKUP_CRON_EXPRESSION: "${BACKUP_CRON_EXPRESSION:-0 4 * * *}"
+      BACKUP_FILENAME: strava-mcp-%Y-%m-%dT%H-%M-%S.tar.gz
+      BACKUP_PRUNING_PREFIX: strava-mcp-
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      # The live mirror and DuckDB's temporary files are left out; the snapshot is a
+      # complete, consistent copy of it.
+      BACKUP_EXCLUDE_REGEXP: '^/backup/strava/(strava\.duckdb(\.wal|\.tmp)?|duckdb-tmp(/.*)?|snapshot/[^/]*\.tmp)$'
+    volumes:
+      - strava-data:/backup/strava:ro
+      - ${BACKUP_DIR:-./backups}:/archive
+
+secrets:
+  mcp-bearer-token:
+    environment: MCP_BEARER_TOKEN
 
 volumes:
   strava-data:
+  grafana-data:
