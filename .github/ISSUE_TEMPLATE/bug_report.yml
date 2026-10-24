@@ -1,0 +1,45 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for the report. Never paste tokens, client secrets or personal activity data; replace ids and names.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The image tag or package version, from /health or docker compose images.
+      placeholder: "4.0.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: how
+    attributes:
+      label: How it runs
+      options:
+        - Docker Compose (this repository's compose.yaml)
+        - Docker image elsewhere
+        - npm package over stdio
+        - From source
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what happened instead. Which client, if a client is involved.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs and status
+      description: Relevant lines from docker compose logs strava-mcp and, for sync problems, the output of strava_sync_status (scrub ids and names).
+      render: text
+  - type: input
+    id: scale
+    attributes:
+      label: Account size
+      description: Roughly how many activities, for memory or performance problems.
+      placeholder: "about 2,000 activities"

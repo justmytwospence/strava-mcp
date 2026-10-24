@@ -43,7 +43,7 @@ Schema changes are migrations applied at startup; the server logs them and the h
 
 The first start converts the raw store: payloads over 4,000 bytes move into `raw_blob` and the point tables are rebuilt without their primary keys. It is one-off, resumable if interrupted, and takes about a minute for 2,000 activities. It must read the old layout, which is exactly what needed so much memory: **allow the container 2 GB for that start** (`STRAVA_MCP_MEMORY=2g`, then back to `1g`), or on a large mirror 2.5 times the size of `raw_payload`. The migration of the 1,859-activity mirror above peaked at 1.9 GB.
 
-Also in 4.0: `MCP_BEARER_TOKEN` is required by the Compose file (set one), `STRAVA_REFRESH_TOKEN` is optional once a token file exists, the Compose file moved from a bind mount to the `strava-data` volume (copy `strava.duckdb`, `tokens.json` and `snapshot/` into it, or restore from a backup), and the DuckDB memory default is 384 MB. The [changelog](https://github.com/justmytwospence/strava-mcp/blob/main/CHANGELOG.md) has the full list.
+Also in 4.0: `MCP_BEARER_TOKEN` is required by the Compose file (set one), `STRAVA_REFRESH_TOKEN` is optional once a token file exists, snapshots are a copy of the mirror file (same size, no longer compacted), and the DuckDB memory default is 384 MB. If your mirror lives in a bind mount of your own, keep that mount in a Compose override or move `strava.duckdb`, `tokens.json` and `snapshot/` into the `strava-data` volume. The [changelog](https://github.com/justmytwospence/strava-mcp/blob/main/CHANGELOG.md) has the full list.
 
 ## Health and logs
 

@@ -1,0 +1,21 @@
+name: Feature request
+description: A tool, a column, a profile, or a behavior you would like
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: The question you want to ask, or the workflow you want to run, and what gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: A tool, a column in a typed table (strava_sync_status lists unmapped fields), a Compose profile, a change in sync behavior.
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else
+      description: Links to Strava API documentation, example payloads with personal data removed, how other tools do it.
