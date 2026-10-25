@@ -64,7 +64,8 @@ export function register(server: McpServer): void {
         athlete_id: z
           .coerce.number()
           .int()
-          .describe("The athlete ID. Use the authenticated athlete's ID from strava_get_authenticated_athlete."),
+          .optional()
+          .describe("Ignored: Strava serves stats only for the authenticated athlete, which the mirror holds. Kept for compatibility."),
       }),
       annotations: {
         readOnlyHint: true,
@@ -73,10 +74,8 @@ export function register(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({ athlete_id }: { athlete_id: number }) => {
+    async (_args: { athlete_id?: number }) => {
       try {
-        // Strava only serves stats for the authenticated athlete, which the mirror tracks.
-        void athlete_id;
         const { data, meta } = await mirror().athleteStats();
         return mirrorResult(data, meta);
       } catch (error) {

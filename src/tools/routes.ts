@@ -10,9 +10,13 @@ export function register(server: McpServer): void {
     "strava_list_athlete_routes",
     {
       title: "List Athlete Routes",
-      description: "List routes created by an athlete.",
+      description: "List the authenticated athlete's routes.",
       inputSchema: z.object({
-        athlete_id: z.coerce.number().int().describe("The athlete ID"),
+        athlete_id: z
+          .coerce.number()
+          .int()
+          .optional()
+          .describe("Ignored: Strava serves only the authenticated athlete's routes, which the mirror holds. Kept for compatibility."),
         ...paginationSchema,
       }),
       annotations: {
@@ -22,18 +26,8 @@ export function register(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({
-      athlete_id,
-      page,
-      per_page,
-    }: {
-      athlete_id: number;
-      page: number;
-      per_page: number;
-    }) => {
+    async ({ page, per_page }: { athlete_id?: number; page: number; per_page: number }) => {
       try {
-        // Only the authenticated athlete's routes are mirrored (Strava serves no others).
-        void athlete_id;
         const { data, meta } = await mirror().routes();
         const routes = pageOf(data as unknown[], page, per_page);
         const note = formatPaginationNote(routes.length, page, per_page);

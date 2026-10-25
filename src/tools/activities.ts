@@ -65,8 +65,8 @@ export function register(server: McpServer): void {
         activity_id: z.coerce.number().int().describe("The activity ID"),
         include_all_efforts: z
           .boolean()
-          .default(false)
-          .describe("Kept for compatibility: the mirror stores every segment effort and always returns them all."),
+          .optional()
+          .describe("Ignored: the mirror stores every segment effort and always returns them all. Kept for compatibility."),
       }),
       annotations: {
         readOnlyHint: true,
@@ -75,16 +75,9 @@ export function register(server: McpServer): void {
         openWorldHint: true,
       },
     },
-    async ({
-      activity_id,
-      include_all_efforts,
-    }: {
-      activity_id: number;
-      include_all_efforts: boolean;
-    }) => {
+    async ({ activity_id }: { activity_id: number; include_all_efforts?: boolean }) => {
       try {
         const { data, meta } = await mirror().activity(String(activity_id));
-        void include_all_efforts;
         return mirrorResult(data, meta);
       } catch (error) {
         return formatToolError(error);
