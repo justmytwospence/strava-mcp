@@ -42,7 +42,7 @@ Priorities below 10 use the interactive class, below 20 incremental, the rest ba
 | `list_window` | day | Relists the last 90 days to find edits |
 | `list_full` | week | Lists everything; activities missing from it are marked deleted |
 | `athlete`, `athlete_stats` | 6 h | Profile and totals (the totals keep a history) |
-| `routes` | hour | Routes and their starred flag (Strava sends no webhook for starring a route) |
+| `routes` | 15 min | Routes and their starred flag (Strava sends no webhook for starring a route) |
 | `athlete_zones`, `starred_segments`, `clubs` | day | |
 
 After every listing the planner compares the mirror with what it should hold and queues the differences: a detail that was never fetched or whose summary changed since, streams and zones that are missing, social payloads whose count on the activity disagrees with what is stored, gear older than a week, routes updated since their last fetch, segments seen in efforts but never fetched. Planning twice adds nothing.

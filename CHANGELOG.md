@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-10-25
+
+### Added
+
+- `GET /export/garmin-sync?since=`, served to the snapshot token: starred routes with their start point and the activities since a time, read live from the mirror, for garmin-mcp's Strava sync (no waiting for the hourly snapshot).
+
+### Changed
+
+- The route list is refreshed every 15 minutes, so an unstarred route reaches consumers within about a quarter of an hour.
+
 ## [4.1.0] - 2026-10-25
 
 ### Changed

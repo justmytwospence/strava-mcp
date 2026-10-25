@@ -71,6 +71,8 @@ CREATE SECRET strava (TYPE http, EXTRA_HTTP_HEADERS MAP {'Authorization': 'Beare
 ATTACH 'http://<host>:8000/snapshot.duckdb' AS strava (READ_ONLY);
 ```
 
+**garmin-mcp's Strava sync.** With `SNAPSHOT_TOKEN` set, `GET /export/garmin-sync?since=<ISO time>` returns, live from the mirror rather than the hourly snapshot, the starred routes (id as a string, name, distance, start point) and the activities that started since `since` (id, name, start, elapsed time), as a few kilobytes of JSON, to the same bearer token. [garmin-mcp](https://github.com/justmytwospence/garmin-mcp) reads it to rename Garmin activities after Strava and to remove courses for unstarred routes; any other consumer may use it too.
+
 **From the volume.** Mount the `strava-data` volume read-only into your container (`strava-mcp_strava-data:/data:ro` with the default project name) and open `/data/snapshot/strava.duckdb` read-only. For Grafana that is a datasource of type `motherduck-duckdb-datasource` with path `/data/snapshot/strava.duckdb?access_mode=read_only` on an Ubuntu-based Grafana image with `GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=motherduck-duckdb-datasource`; `deploy/grafana/` is a working example to copy from.
 
 **What to back up.** `tokens.json` and `snapshot/strava.duckdb` in the volume. Never copy the live `strava.duckdb` while the server runs; it is not consistent on disk between checkpoints.

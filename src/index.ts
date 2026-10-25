@@ -24,6 +24,7 @@ import {
   VERSION,
 } from "./server.js";
 import { SnapshotPublisher } from "./snapshot.js";
+import { garminSyncExport } from "./export.js";
 import { StravaWebhook, type WebhookEvent } from "./webhook.js";
 import { limiter } from "./strava-client.js";
 import { SyncEngine } from "./sync/engine.js";
@@ -150,6 +151,16 @@ if (transport === "stdio") {
     if (!snapshotToken) return c.text("Snapshot serving is disabled (set SNAPSHOT_TOKEN)", 404);
     if (!bearerMatches(snapshotToken, c.req.header("authorization"))) return c.text("Unauthorized", 401);
     return snapshot.serve(c.req.raw);
+  });
+
+  // What garmin-mcp's Strava sync needs, live (no waiting for the snapshot); same token.
+  app.get("/export/garmin-sync", async (c) => {
+    if (!snapshotToken) return c.text("Export is disabled (set SNAPSHOT_TOKEN)", 404);
+    if (!bearerMatches(snapshotToken, c.req.header("authorization"))) return c.text("Unauthorized", 401);
+    const raw = c.req.query("since");
+    const since = raw ? new Date(raw) : null;
+    if (since && Number.isNaN(since.getTime())) return c.text("since must be an ISO date or timestamp", 400);
+    return c.json(await garminSyncExport(db, since));
   });
 
   // Optional bearer for the MCP endpoint itself, for when the server shares a network

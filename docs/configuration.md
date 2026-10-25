@@ -27,7 +27,7 @@ Everything is an environment variable. With Compose they come from `.env` (copy 
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `SNAPSHOT_TOKEN` | unset | Serve the read-only snapshot at `GET /snapshot.duckdb` to this bearer token. Unset: not served over HTTP. The Grafana and notebook profiles read the file from the volume and do not need it. |
+| `SNAPSHOT_TOKEN` | unset | Serve the read-only snapshot at `GET /snapshot.duckdb`, and garmin-mcp's sync export at `GET /export/garmin-sync` ([Extras](extras.md#using-your-own)), to this bearer token. Unset: neither is served over HTTP. The Grafana and notebook profiles read the file from the volume and do not need it. |
 | `STRAVA_SNAPSHOT_DIR` | `snapshot/` next to the mirror | Where the snapshot is published. |
 | `STRAVA_WEBHOOK_URL` | unset | Public HTTPS URL for Strava's push events, with a secret path (`https://strava.example.com/webhook/<random>`). The server registers the subscription itself. Unset: the activity list is polled every 15 minutes. See [How sync works](sync.md#webhook). |
 | `STRAVA_SYNC` | `on` | `off` disables the background sync and the snapshot timer: tools answer from the mirror and fetch what they are asked for. |
