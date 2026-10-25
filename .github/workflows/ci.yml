@@ -16,7 +16,10 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm run lint
       - run: pnpm run build
+      # tsx --test does not type-check, so tests and scripts are checked separately.
+      - run: pnpm run typecheck
       - run: pnpm test
       # The generated references must match the code they are generated from.
       - run: pnpm run docs:gen
