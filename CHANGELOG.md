@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [semantic versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Changed
+
+- The route list is refreshed hourly instead of daily, so starring or unstarring a route (which Strava sends no webhook for) reaches the snapshot within about two hours.
+
 ## [4.0.0] - Unreleased
 
 A release for strangers: a self-contained Compose stack, a documentation site, an authorization command, and a raw store that keeps memory bounded on real accounts.

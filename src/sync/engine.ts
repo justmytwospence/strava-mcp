@@ -52,7 +52,9 @@ const PERIODIC: Array<{ kind: string; every: number; priority: number }> = [
   { kind: "athlete_zones", every: DAY, priority: 15 },
   { kind: "list_window", every: DAY, priority: 15 },
   { kind: "starred_segments", every: DAY, priority: 15 },
-  { kind: "routes", every: DAY, priority: 15 },
+  // Hourly (one or two requests): Strava sends no webhook for starring or unstarring a route,
+  // and consumers of the snapshot (garmin-mcp's course cleanup) act on the starred flag.
+  { kind: "routes", every: HOUR, priority: 15 },
   { kind: "clubs", every: DAY, priority: 15 },
   { kind: "list_full", every: 7 * DAY, priority: 25 },
 ];
