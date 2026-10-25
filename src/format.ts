@@ -97,6 +97,11 @@ export function formatWeight(
   return `${Math.round(kilograms * 10) / 10} kg`;
 }
 
+/**
+ * A readable date and time. Strava's `start_date_local` is the wall-clock time at
+ * the activity with a fake Z suffix, so it is rendered as UTC: rendering it in the
+ * process's own zone would shift it.
+ */
 export function formatDate(isoString: string): string {
   const d = new Date(isoString);
   return d.toLocaleDateString("en-US", {
@@ -106,6 +111,7 @@ export function formatDate(isoString: string): string {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "UTC",
   });
 }
 
