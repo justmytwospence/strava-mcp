@@ -61,11 +61,11 @@ sequenceDiagram
   G->>S: POST /mcp, Authorization: Bearer MCP_BEARER_TOKEN
 ```
 
-The gateway verifies the token's signature against `OIDC_JWKS_URL`, its issuer against `OIDC_ISSUER`, and its audience against `OIDC_AUDIENCE` (the client id by default). You put your own TLS reverse proxy in front of the gateway's port at `PUBLIC_URL`; the gateway does not terminate TLS. The server's own port can then stay unpublished: remove the `ports` entry of `strava-mcp` in a Compose override.
+The gateway verifies the token's signature against `OIDC_JWKS_URL`, its issuer against `OIDC_ISSUER`, and its audience against `OIDC_AUDIENCE` (the client id by default). All of `OIDC_ISSUER`, `OIDC_JWKS_URL`, `OIDC_CLIENT_ID` and `PUBLIC_URL` are required; there is no default JWKS path because every provider publishes it somewhere else (find it as `jwks_uri` in `<issuer>/.well-known/openid-configuration`, or in the [provider notes](#providers) below). You put your own TLS reverse proxy in front of the gateway's port at `PUBLIC_URL`; the gateway does not terminate TLS. The server's own port can then stay unpublished: remove the `ports` entry of `strava-mcp` in a Compose override.
 
 ```ini
 OIDC_ISSUER=https://auth.example.com
-OIDC_JWKS_URL=https://auth.example.com/jwks.json
+OIDC_JWKS_URL=https://auth.example.com/jwks.json        # your provider's jwks_uri
 OIDC_CLIENT_ID=strava-mcp
 PUBLIC_URL=https://strava.example.com
 ```
@@ -81,7 +81,7 @@ The last command must return JSON naming your issuer in `authorization_servers`;
 
 Register a client for this server with:
 
-- **Redirect URIs**: `https://claude.ai/api/mcp/auth_callback` for claude.ai, Claude Desktop and the mobile apps, and a loopback redirect for Claude Code and other local clients: `http://localhost:<port>/callback`. Claude Code picks an ephemeral port per session; if your provider cannot match a redirect URI regardless of port, pin it with `claude mcp add ... --callback-port 3118` (or `oauth.callbackPort` in pi's `mcp.json`) and register `http://localhost:3118/callback`.
+- **Redirect URIs**: `https://claude.ai/api/mcp/auth_callback` for claude.ai, Claude Desktop and the mobile apps, and a loopback redirect for Claude Code and other local clients: `http://localhost:<port>/callback`. Claude Code picks an ephemeral port per session; if your provider cannot match a redirect URI regardless of port, pin it with `claude mcp add ... --callback-port <port>` (or `oauth.callbackPort` in pi's `mcp.json`, which uses `http://127.0.0.1:<port>/callback`) and register that URI, choosing any free port on your machine.
 - **Grant types**: authorization code with PKCE (S256) and refresh token.
 - **Scopes**: `openid`, `profile`, `offline_access`. These are what the gateway advertises in `scopes_supported` and what clients request.
 - **Public client** (no secret) is the usual choice: Claude Code and claude.ai's custom connectors register as public clients. Providers with dynamic client registration let clients register themselves instead; the Claude apps use it when the provider advertises a `registration_endpoint`.
@@ -93,7 +93,7 @@ In claude.ai, add the server as a custom connector with the URL `PUBLIC_URL/mcp`
 
 === "Authelia"
 
-    Issuer `https://auth.example.com`, JWKS `https://auth.example.com/jwks.json` (the default). Add the client to `identity_providers.oidc.clients` with `public: true`, `redirect_uris`, `scopes: [openid, profile, offline_access]`, `grant_types: [authorization_code, refresh_token]`, `pkce_challenge_method: S256`, and `access_token_signed_response_alg: RS256`, so that access tokens are JWTs the gateway can verify (Authelia issues opaque tokens otherwise). Authelia has no dynamic registration and matches redirect URIs exactly: pin Claude Code's port.
+    Issuer `https://auth.example.com`, JWKS `https://auth.example.com/jwks.json`. Add the client to `identity_providers.oidc.clients` with `public: true`, `redirect_uris`, `scopes: [openid, profile, offline_access]`, `grant_types: [authorization_code, refresh_token]`, `pkce_challenge_method: S256`, and `access_token_signed_response_alg: RS256`, so that access tokens are JWTs the gateway can verify (Authelia issues opaque tokens otherwise). Authelia has no dynamic registration and matches redirect URIs exactly: pin Claude Code's port.
 
 === "Authentik"
 
