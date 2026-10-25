@@ -1,9 +1,34 @@
 {
-  "name": "strava-mcp-server",
+  "name": "@justmytwospence/strava-mcp",
   "version": "4.2.0",
-  "description": "MCP server for the Strava API",
+  "description": "MCP server for your own Strava account, backed by a complete local DuckDB mirror: fast cache-first tools, read-only SQL, a rate-limit-aware background sync with webhook support, and a snapshot for dashboards, notebooks and backups.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "strava",
+    "duckdb",
+    "cycling",
+    "running",
+    "training",
+    "fitness",
+    "claude",
+    "llm",
+    "self-hosted"
+  ],
+  "homepage": "https://justmytwospence.github.io/strava-mcp/",
+  "bugs": {
+    "url": "https://github.com/justmytwospence/strava-mcp/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/justmytwospence/strava-mcp.git"
+  },
+  "license": "MIT",
+  "author": "Spencer Boucher",
   "type": "module",
-  "main": "dist/index.js",
+  "exports": {
+    "./package.json": "./package.json"
+  },
   "bin": {
     "strava-mcp-server": "dist/index.js",
     "strava-mcp-auth": "dist/auth-cli.js"
@@ -27,7 +52,11 @@
     "bench": "node scripts/bench-memory.ts"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "packageManager": "pnpm@12.14.0+sha512.c18ba6d87993d3d164cb5e8948f32b2c06ee854487e06cd8d86781342fb3e5bb4634367034711e86802baa9c37bea906ce1929ad08d70884c97d801df13389a6",
   "dependencies": {
