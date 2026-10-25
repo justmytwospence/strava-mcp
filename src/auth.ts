@@ -12,7 +12,7 @@
 import { randomBytes } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import { createInterface } from "node:readline";
-import { STRAVA_TOKEN_URL } from "./constants.js";
+import { DEFAULT_TOKEN_FILE, STRAVA_TOKEN_URL } from "./constants.js";
 import { type StoredTokens, writeTokenFile } from "./token-store.js";
 
 export const DEFAULT_SCOPES = "read,activity:read_all,activity:write,profile:read_all";
@@ -145,7 +145,7 @@ export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env):
   const o: AuthOptions = {
     clientId: env.STRAVA_CLIENT_ID ?? "",
     clientSecret: env.STRAVA_CLIENT_SECRET ?? "",
-    tokenFile: env.STRAVA_TOKEN_FILE ?? "./state/tokens.json",
+    tokenFile: env.STRAVA_TOKEN_FILE || DEFAULT_TOKEN_FILE,
     port: Number(env.STRAVA_AUTH_PORT ?? DEFAULT_PORT),
     scopes: DEFAULT_SCOPES,
     noListen: false,
@@ -181,7 +181,7 @@ Reads STRAVA_CLIENT_ID, STRAVA_CLIENT_SECRET and STRAVA_TOKEN_FILE from the envi
   --port N           Port for the http://localhost:N/callback redirect (default ${DEFAULT_PORT},
                      or STRAVA_AUTH_PORT). The app's Authorization Callback Domain must be localhost.
   --scopes LIST      Scopes to request (default ${DEFAULT_SCOPES})
-  --token-file PATH  Where to write the tokens (default STRAVA_TOKEN_FILE or ./state/tokens.json)
+  --token-file PATH  Where to write the tokens (default STRAVA_TOKEN_FILE or ${DEFAULT_TOKEN_FILE})
   --no-listen        Do not open a port; paste the redirected URL instead (headless servers)`;
 
 export async function main(argv: string[]): Promise<void> {

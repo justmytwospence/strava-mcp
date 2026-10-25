@@ -1,4 +1,4 @@
-import { STRAVA_API_BASE, STRAVA_TOKEN_URL } from "./constants.js";
+import { DEFAULT_TOKEN_FILE, STRAVA_API_BASE, STRAVA_TOKEN_URL } from "./constants.js";
 import { StravaApiError } from "./errors.js";
 import { type Priority, RateLimiter } from "./sync/rate-limit.js";
 import { readTokenFile, writeTokenFile } from "./token-store.js";
@@ -68,12 +68,12 @@ let refreshToken = process.env.STRAVA_REFRESH_TOKEN ?? "";
 let refreshPromise: Promise<void> | null = null;
 
 /**
- * Optional token store (STRAVA_TOKEN_FILE, see token-store.ts). Strava can rotate the
- * refresh token on any refresh, which would leave the one in the environment dead
- * after the next restart, so the stored pair is preferred at startup and rewritten
- * after every refresh.
+ * The token store (STRAVA_TOKEN_FILE, see token-store.ts; the same default as
+ * strava-mcp-auth). Strava can rotate the refresh token on any refresh, which would
+ * leave the one in the environment dead after the next restart, so the stored pair is
+ * preferred at startup and rewritten after every refresh.
  */
-const tokenFile = process.env.STRAVA_TOKEN_FILE;
+const tokenFile = process.env.STRAVA_TOKEN_FILE || DEFAULT_TOKEN_FILE;
 
 const stored = readTokenFile(tokenFile);
 if (stored) {
@@ -87,7 +87,6 @@ export function hasRefreshToken(): boolean {
 }
 
 function saveTokens(data: TokenResponse): void {
-  if (!tokenFile) return;
   try {
     writeTokenFile(tokenFile, {
       access_token: data.access_token,

@@ -15,6 +15,7 @@ import { register as registerSegmentResources } from "./resources/segments.js";
 import { register as registerRouteResources } from "./resources/routes.js";
 import { register as registerReferenceResources } from "./resources/reference.js";
 
+import { DEFAULT_TOKEN_FILE } from "./constants.js";
 import { mirror } from "./context.js";
 import { register as registerMirrorTools } from "./tools/mirror-tools.js";
 import { setDefaultUnits } from "./format.js";
@@ -43,11 +44,9 @@ export function validateEnv(): void {
   }
 
   if (!hasRefreshToken() && !process.env.STRAVA_ACCESS_TOKEN) {
-    const file = process.env.STRAVA_TOKEN_FILE;
+    const file = process.env.STRAVA_TOKEN_FILE || DEFAULT_TOKEN_FILE;
     console.error(
-      file
-        ? `No Strava tokens: ${file} has no refresh token and STRAVA_REFRESH_TOKEN is unset. Run strava-mcp-auth once to authorize (docker compose run --rm -p 8765:8765 strava-mcp auth).`
-        : "No Strava tokens: set STRAVA_REFRESH_TOKEN, or set STRAVA_TOKEN_FILE and run strava-mcp-auth once to authorize.",
+      `No Strava tokens: ${file} has no refresh token and STRAVA_REFRESH_TOKEN is unset. Run strava-mcp-auth once to authorize (with Compose: docker compose run --rm -p 8765:8765 strava-mcp auth).`,
     );
     process.exit(1);
   }

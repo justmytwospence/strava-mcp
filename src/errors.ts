@@ -17,7 +17,7 @@ export function formatToolError(error: unknown): {
   if (error instanceof StravaApiError) {
     switch (error.statusCode) {
       case 401:
-        message = `Authentication failed (401). Your access token may be expired. Ensure STRAVA_ACCESS_TOKEN and STRAVA_REFRESH_TOKEN are set correctly.`;
+        message = `Authentication failed (401). Strava rejected the token and a refresh did not help: the athlete may have revoked the application. Re-run strava-mcp-auth (with Compose: docker compose run --rm -p 8765:8765 strava-mcp auth) to authorize again.`;
         break;
       case 403:
         message = `Forbidden (403). You may not have the required scope for this operation. ${error.message}`;

@@ -1,6 +1,16 @@
-// Strava moves the API to https://api-v3.strava.com (available 2027-01-04); override to switch early.
+// Strava's changelog (https://developers.strava.com/docs/changelog/, June 1, 2026) announces
+// https://api-v3.strava.com as the new base URL, available from January 4, 2027; override to switch early.
 export const STRAVA_API_BASE = process.env.STRAVA_API_BASE ?? "https://www.strava.com/api/v3";
 export const STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token";
+
+/**
+ * Where the mirror and the token file live when STRAVA_DB_PATH and STRAVA_TOKEN_FILE
+ * are unset: a state directory under the working directory. The image sets both under
+ * /data instead.
+ */
+export const DEFAULT_STATE_DIR = "./state";
+export const DEFAULT_DB_PATH = `${DEFAULT_STATE_DIR}/strava.duckdb`;
+export const DEFAULT_TOKEN_FILE = `${DEFAULT_STATE_DIR}/tokens.json`;
 export const CHARACTER_LIMIT = 25_000;
 export const DEFAULT_PAGE_SIZE = 30;
 export const MAX_PAGE_SIZE = 200;

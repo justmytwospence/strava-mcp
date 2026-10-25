@@ -171,7 +171,7 @@ async function main(): Promise<void> {
     STRAVA_CLIENT_ID: "docs",
     STRAVA_CLIENT_SECRET: "docs",
     STRAVA_REFRESH_TOKEN: "docs",
-    STRAVA_TOKEN_FILE: "",
+    STRAVA_TOKEN_FILE: join(dir, "tokens.json"),
     STRAVA_SYNC: "off",
     STRAVA_UNITS: "metric",
     STRAVA_DB_PATH: join(dir, "strava.duckdb"),
