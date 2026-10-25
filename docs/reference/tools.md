@@ -69,7 +69,7 @@ Get high-resolution time-series data for a segment effort.
 |---|---|---|---|
 | `effort_id` | string | yes | The segment effort ID |
 | `keys` | array of `time`, `distance`, `latlng`, `altitude`, `velocity_smooth`, `heartrate`, `cadence`, `watts`, `temp`, `moving`, `grade_smooth` | yes | Stream types to retrieve |
-| `max_points` | integer (min 10, max 2000) | no | Maximum data points (10-2000, default 500) Default `500`. |
+| `max_points` | integer (min 10, max 2000) | no | Maximum data points to return (10-2000, default 500). Streams are downsampled if larger. Default `500`. |
 
 ### `strava_get_segment_streams`
 
@@ -83,7 +83,7 @@ Get GPS coordinates, distance, and altitude data for a segment.
 |---|---|---|---|
 | `segment_id` | integer | yes | The segment ID |
 | `keys` | array of `latlng`, `distance`, `altitude` | yes | Stream types: latlng, distance, altitude |
-| `max_points` | integer (min 10, max 2000) | no | Maximum data points (10-2000, default 500) Default `500`. |
+| `max_points` | integer (min 10, max 2000) | no | Maximum data points to return (10-2000, default 500). Streams are downsampled if larger. Default `500`. |
 
 ### `strava_get_route_streams`
 
@@ -96,7 +96,7 @@ Get GPS coordinates, distance, and altitude data for a route.
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `route_id` | string | yes | The route ID |
-| `max_points` | integer (min 10, max 2000) | no | Maximum data points (10-2000, default 500) Default `500`. |
+| `max_points` | integer (min 10, max 2000) | no | Maximum data points to return (10-2000, default 500). Streams are downsampled if larger. Default `500`. |
 
 ## Uploads
 
@@ -136,13 +136,13 @@ Upload an activity file (FIT, TCX, or GPX format) to create a new activity. The 
 
 **List Athlete Routes**
 
-List routes created by an athlete.
+List the authenticated athlete's routes.
 
 *read-only, idempotent.*
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `athlete_id` | integer | yes | The athlete ID |
+| `athlete_id` | integer | no | Ignored: Strava serves only the authenticated athlete's routes, which the mirror holds. Kept for compatibility. |
 | `page` | integer (min 1) | no | Page number (default 1) Default `1`. |
 | `per_page` | integer (min 1, max 200) | no | Results per page (1-200, default 30) Default `30`. |
 
@@ -330,7 +330,7 @@ Get detailed information about a specific activity including description, calori
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `activity_id` | integer | yes | The activity ID |
-| `include_all_efforts` | boolean | no | Kept for compatibility: the mirror stores every segment effort and always returns them all. Default `false`. |
+| `include_all_efforts` | boolean | no | Ignored: the mirror stores every segment effort and always returns them all. Kept for compatibility. |
 
 ### `strava_create_activity`
 
@@ -448,13 +448,13 @@ No parameters.
 
 **Get Athlete Stats**
 
-Get activity statistics for an athlete: recent, year-to-date, and all-time totals for runs, rides, and swims. Includes biggest ride distance and biggest climb.
+Get activity statistics for the authenticated athlete: recent, year-to-date, and all-time totals for runs, rides, and swims. Includes biggest ride distance and biggest climb.
 
 *read-only, idempotent.*
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `athlete_id` | integer | yes | The athlete ID. Use the authenticated athlete's ID from strava_get_authenticated_athlete. |
+| `athlete_id` | integer | no | Ignored: Strava serves stats only for the authenticated athlete, which the mirror holds. Kept for compatibility. |
 
 ## Resources
 
