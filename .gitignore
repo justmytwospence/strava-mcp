@@ -1,6 +1,18 @@
 node_modules/
 dist/
-.env
-backups/
 site/
 __marimo__/
+
+# Local configuration and overrides
+.env
+.env.*
+!.env.example
+compose.override.yaml
+
+# The mirror, tokens and snapshot of a local run, and backups of the backup profile
+state/
+*.duckdb
+*.duckdb.wal
+backups/
+
+.DS_Store
