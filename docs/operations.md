@@ -51,23 +51,13 @@ Also in 4.0: `MCP_BEARER_TOKEN` is required by the Compose file (set one), `STRA
 - `docker compose logs -f strava-mcp` shows startup, migrations, each failed job, webhook registration, and snapshot failures. Routine jobs are not logged; `sync_log` in the mirror has them, and `strava_sync_status` summarizes.
 - `strava_sync_status` is the first thing to ask when something looks stale: it shows the queue, the last run of each periodic task, the last errors, the rate-limit usage and the webhook state.
 
+## Snapshots
+
+The server publishes `snapshot/strava.duckdb` next to the mirror: at startup when there is no snapshot yet (so a fresh install has a file within seconds, nearly empty) or the existing one is older than the interval, then at most hourly while the sync is idle and every six hours during a backfill, and only when the mirror changed since the last publish. A publish is a checkpoint and a file copy under the write lock, a few seconds for a mirror of a few hundred megabytes, during which tools wait. It is skipped while a `strava_query` has a transaction open and retried a minute later; a failure is logged as `snapshot: publish failed`.
+
 ## Troubleshooting
 
-**The server exits with status 70 and restarts.** DuckDB declared the database invalid after a failed commit or rollback (it logs `the DuckDB database is no longer usable`). Exiting is deliberate: every later statement would fail, and a restart recovers from the write-ahead log. If it repeats, check the disk (space, a read-only volume) and the memory limit; an out-of-memory during a checkpoint is the usual cause.
-
-**`Cannot refresh the Strava token`** at startup. No refresh token anywhere: run `docker compose run --rm -p 8765:8765 strava-mcp auth`. After the athlete revokes the application, the same error appears on the next refresh; authorize again.
-
-**`401` from `/mcp`.** The client sends no bearer, or the wrong one. With the oauth profile, the gateway answers `401` with a `WWW-Authenticate` pointer by design; a client that does not support MCP authorization needs the bearer and the server's own port instead.
-
-**`Invalid Host header`.** `MCP_ALLOWED_HOSTS` is set and does not include the hostname the client used.
-
-**Webhook `registration failed`.** Strava could not validate the callback: the URL is not public, has no valid certificate, or the path is proxied with a different prefix. The server retries with backoff and polls every 15 minutes meanwhile.
-
-**Rate limited.** `strava_sync_status` shows `blocked_until` and the usage of both pools. The backfill slows down by design; tools keep a reserved share. If you also use the application elsewhere, the shares are computed from the headers Strava returns, so the other use is accounted for.
-
-**Grafana shows no data.** The datasource reads the snapshot, which exists only after the first publish (an hour after the first sync, six during a backfill); until then the file is missing. Check `docker compose logs grafana` for the plugin loading (`motherduck-duckdb-datasource`).
-
-**The migration was interrupted.** Start again; it resumes from its last committed vector. A mirror left with `raw_payload_v2` is in the middle of the migration and is handled on the next start.
+Moved to its own page: [Troubleshooting](troubleshooting.md) covers authentication errors and token refresh, rate limits and a spent daily budget, webhook registration, missing or empty snapshots, memory and database errors, and unmapped fields.
 
 ## Stopping and removing
 
