@@ -14,7 +14,13 @@ strava-mcp is a self-hosted [MCP](https://modelcontextprotocol.io/) server for o
 [Get started](quickstart.md){ .md-button .md-button--primary }
 [GitHub](https://github.com/justmytwospence/strava-mcp){ .md-button }
 
-<!-- screenshots -->
+=== "Ask in plain language"
+
+    ![A question about the most-run segments answered with strava_query from the mirror](assets/screenshots/chat.png)
+
+=== "Grafana dashboard"
+
+    ![The bundled Grafana dashboard: hours by sport, distance and elevation, heart rate, pace and speed, recent activities](assets/screenshots/grafana.png)
 
 <div class="grid cards" markdown>
 

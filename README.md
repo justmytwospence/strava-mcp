@@ -11,7 +11,10 @@
 
 strava-mcp is a self-hosted [MCP](https://modelcontextprotocol.io/) server for one athlete's own Strava data. A background sync copies everything Strava's API returns for the account into a single [DuckDB](https://duckdb.org/) file, within Strava's rate limits; the tools answer from that file, and a read-only snapshot of it feeds Grafana, notebooks and backups. One container, one `docker compose up -d`.
 
-<!-- screenshots -->
+<p align="center">
+  <img src="docs/assets/screenshots/chat.png" alt="A question about the most-run segments answered from the mirror" width="49%">
+  <img src="docs/assets/screenshots/grafana.png" alt="The bundled Grafana dashboard over the snapshot" width="49%">
+</p>
 
 - **A complete mirror.** Activities with laps, splits, best efforts and every segment effort; full-resolution streams; zones; kudos, comments, photos; gear, segments, routes, clubs, the profile and a history of its totals. Stored verbatim, versioned when it changes, projected into typed tables with a description on every column.
 - **Rate-limit aware sync.** Usage comes from Strava's headers; background work takes at most 75% of each window and spreads it over the day, so your questions always have budget. A webhook delivers new activities in seconds.
