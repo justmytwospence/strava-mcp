@@ -4,6 +4,32 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- `STRAVA_ROUTES_INTERVAL_MINUTES`: how often the route list (and each route's starred flag) is refreshed, default 60, minimum 5. Lower it when something consumes the starred flag promptly, such as garmin-mcp's course cleanup.
+- `GET /export/sync`, the live export for other services, documented as a stable contract in the new Export API reference. `/export/garmin-sync` stays as an alias.
+- The npm package `@justmytwospence/strava-mcp` (bins `strava-mcp-server` and `strava-mcp-auth`), published with provenance by the release workflow, which now also creates the GitHub Release from the changelog.
+- `LICENSE` (MIT), a pull request template, Biome linting and a type check over the tests and scripts in CI.
+- Documentation: a product home page, FAQ, troubleshooting, first-sync guide, client setup for Claude Code, Claude Desktop, claude.ai, Cursor, VS Code, Codex, ChatGPT, Gemini CLI and pi, and a garmin-mcp integration page.
+
+### Changed
+
+- The route list is refreshed hourly by default again (4.2 polled every 15 minutes for every user, about a tenth of the default daily read budget); see `STRAVA_ROUTES_INTERVAL_MINUTES`.
+- Compose passes the whole `.env` to the server through `env_file`, so every documented variable applies without being listed in `compose.yaml`; an empty variable counts as unset.
+- Grafana and the notebook are published on `127.0.0.1` only (`GRAFANA_BIND`, `MARIMO_BIND` to change), since one has a default password and the other no login.
+- `OIDC_JWKS_URL` is required for the `oauth` profile; its former default was Authelia's path.
+- The server defaults `STRAVA_TOKEN_FILE` to `./state/tokens.json` outside the image, the same file `strava-mcp-auth` writes, so an npx run finds its tokens without configuration.
+- `athlete_id` on `strava_list_athlete_routes` and `strava_get_athlete_stats`, and `include_all_efforts` on `strava_get_activity`, are optional; they were always ignored.
+- Node 22 or later is required (20 is end-of-life).
+
+### Fixed
+
+- `strava_get_upload` and `strava_create_upload` could wait until midnight UTC after a daily rate limit; they now use the same 20-second wait cap as every other tool and answer with an error instead.
+- The prompts and the segment GPX export format elevation and weight in the athlete's units (`STRAVA_UNITS`), and the activity analysis shows mile splits for imperial athletes; they hard-coded metres and kilograms.
+- Dates in the prompts are rendered in UTC, so `start_date_local` is no longer shifted by the server's time zone.
+- The export's route start point is decoded with `@mapbox/polyline`; a polyline that does not decode to a point on Earth gives `null`.
+- Documentation: the snapshot is first published at startup, not within an hour of the first sync; the freshness and priority tables were incomplete; uploads are not stored; the rate-limit figures and the api-v3 date cite Strava's pages.
+
 ## [4.2.0] - 2026-10-25
 
 ### Added
