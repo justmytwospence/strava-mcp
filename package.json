@@ -19,6 +19,9 @@
     "prepare": "tsc",
     "start:http": "MCP_TRANSPORT=http node dist/index.js",
     "test": "tsx --test 'test/**/*.test.ts'",
+    "lint": "biome check",
+    "lint:fix": "biome check --write",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "docs:gen": "tsx scripts/gen-tools.ts && tsx scripts/gen-schema.ts",
     "docs:build": "mkdocs build --strict",
     "bench": "node scripts/bench-memory.ts"
@@ -38,6 +41,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.15",
     "@types/mapbox__polyline": "^1.0.5",
     "@types/node": "^22.10.0",
     "tsx": "^4.19.2",
