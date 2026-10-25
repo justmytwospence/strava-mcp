@@ -15,17 +15,16 @@ services:
   strava-mcp:
     image: ghcr.io/justmytwospence/strava-mcp:4
     restart: unless-stopped
+    # The whole .env is passed to the server, so every server variable it names (see
+    # .env.example) applies without being listed here. The entries below add the
+    # required-variable checks and the image's defaults for an empty value.
+    env_file:
+      - path: .env
+        required: false
     environment:
       STRAVA_CLIENT_ID: "${STRAVA_CLIENT_ID:?set STRAVA_CLIENT_ID in .env, from https://www.strava.com/settings/api}"
       STRAVA_CLIENT_SECRET: "${STRAVA_CLIENT_SECRET:?set STRAVA_CLIENT_SECRET in .env}"
-      # Optional: a refresh token from your own OAuth flow. Not needed after `strava-mcp auth`.
-      STRAVA_REFRESH_TOKEN: ${STRAVA_REFRESH_TOKEN:-}
-      STRAVA_ACCESS_TOKEN: ${STRAVA_ACCESS_TOKEN:-}
       MCP_BEARER_TOKEN: "${MCP_BEARER_TOKEN:?set MCP_BEARER_TOKEN in .env, for example from openssl rand -hex 32}"
-      SNAPSHOT_TOKEN: ${SNAPSHOT_TOKEN:-}
-      STRAVA_UNITS: ${STRAVA_UNITS:-}
-      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-}
-      STRAVA_WEBHOOK_URL: ${STRAVA_WEBHOOK_URL:-}
       STRAVA_SYNC: ${STRAVA_SYNC:-on}
       STRAVA_API_BASE: "${STRAVA_API_BASE:-https://www.strava.com/api/v3}"
       DUCKDB_MEMORY_LIMIT: ${DUCKDB_MEMORY_LIMIT:-384MB}
@@ -47,6 +46,9 @@ services:
   # OAuth 2.1 resource server in front of /mcp: validates JWTs from your OIDC provider,
   # publishes /.well-known/oauth-protected-resource, and forwards to the server with the
   # backend bearer. Put your TLS reverse proxy in front of port 3000 at PUBLIC_URL.
+  # OIDC_ISSUER, OIDC_JWKS_URL, OIDC_CLIENT_ID and PUBLIC_URL are all required for this
+  # profile (agentgateway refuses to start without them); they are not marked required
+  # here because compose interpolates inactive profiles too.
   oauth:
     image: cr.agentgateway.dev/agentgateway:v1.6.0
     profiles: [oauth]
@@ -55,10 +57,10 @@ services:
     depends_on:
       - strava-mcp
     environment:
-      # Required for this profile (agentgateway refuses to start without it); not marked
-      # required here because compose interpolates inactive profiles too.
       OIDC_ISSUER: "${OIDC_ISSUER:-}"
-      OIDC_JWKS_URL: "${OIDC_JWKS_URL:-${OIDC_ISSUER}/jwks.json}"
+      # No default: every provider publishes its JWKS at a different path (see the
+      # authentication guide). Find it as jwks_uri in <issuer>/.well-known/openid-configuration.
+      OIDC_JWKS_URL: "${OIDC_JWKS_URL:-}"
       OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:-}"
       OIDC_AUDIENCE: "${OIDC_AUDIENCE:-${OIDC_CLIENT_ID}}"
       PUBLIC_URL: "${PUBLIC_URL:-}"
@@ -97,11 +99,16 @@ services:
       - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
       - grafana-data:/var/lib/grafana
+    # Published on the loopback interface only: the default login is admin/admin. Set
+    # GRAFANA_BIND=0.0.0.0 (and a real password) to reach it from other machines.
     ports:
-      - "${GRAFANA_PORT:-3001}:3000"
+      - "${GRAFANA_BIND:-127.0.0.1}:${GRAFANA_PORT:-3001}:3000"
 
   # --- profile: notebooks ---------------------------------------------------------------
-  # A marimo notebook served read-only (marimo run) over the snapshot.
+  # A marimo notebook served read-only (marimo run) over the snapshot. It runs without
+  # a token, so the port is published on the loopback interface only; set
+  # MARIMO_BIND=0.0.0.0 to reach it from other machines, behind something that
+  # authenticates.
   notebooks:
     image: ghcr.io/marimo-team/marimo:0.24.0-sql
     profiles: [notebooks]
@@ -115,7 +122,7 @@ services:
       - strava-data:/data:ro
       - ./deploy/notebooks:/notebooks:ro
     ports:
-      - "${MARIMO_PORT:-2718}:8080"
+      - "${MARIMO_BIND:-127.0.0.1}:${MARIMO_PORT:-2718}:8080"
 
   # --- profile: backup ------------------------------------------------------------------
   # Archives of tokens.json and the snapshot (never the live strava.duckdb, which the
