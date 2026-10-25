@@ -160,7 +160,12 @@ export class RateLimiter {
   }
 
   /** Wait until a request may start, then claim the slot. Gives up (returns false) after maxWaitMs. */
-  async acquire(priority: Priority, method: string, path: string, maxWaitMs = Number.POSITIVE_INFINITY): Promise<boolean> {
+  async acquire(
+    priority: Priority,
+    method: string,
+    path: string,
+    maxWaitMs = Number.POSITIVE_INFINITY,
+  ): Promise<boolean> {
     const deadline = this.now() + maxWaitMs;
     for (;;) {
       const delay = this.delayFor(priority, method, path);
@@ -184,7 +189,8 @@ export class RateLimiter {
   status(): Record<string, unknown> {
     const now = this.now();
     const show = (u: Usage | null) =>
-      u && (({ usage15, usageDay, limit15, limitDay }) => ({ usage15, usageDay, limit15, limitDay }))(currentUsage(u, now));
+      u &&
+      (({ usage15, usageDay, limit15, limitDay }) => ({ usage15, usageDay, limit15, limitDay }))(currentUsage(u, now));
     return {
       read: show(this.read),
       overall: show(this.overall),

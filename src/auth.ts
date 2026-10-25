@@ -86,7 +86,12 @@ export async function exchangeCode(
   const res = await http(STRAVA_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ client_id: o.clientId, client_secret: o.clientSecret, code, grant_type: "authorization_code" }),
+    body: JSON.stringify({
+      client_id: o.clientId,
+      client_secret: o.clientSecret,
+      code,
+      grant_type: "authorization_code",
+    }),
   });
   const text = await res.text();
   if (!res.ok) throw new Error(`Strava refused the code (HTTP ${res.status}): ${text}`);
@@ -108,7 +113,11 @@ export async function exchangeCode(
 }
 
 /** Wait for Strava's redirect on the port, or for a pasted redirect on stdin, whichever comes first. */
-export function waitForRedirect(port: number, listen: boolean, input: NodeJS.ReadableStream = process.stdin): Promise<Redirect> {
+export function waitForRedirect(
+  port: number,
+  listen: boolean,
+  input: NodeJS.ReadableStream = process.stdin,
+): Promise<Redirect> {
   return new Promise((resolve, reject) => {
     let server: Server | null = null;
     const rl = createInterface({ input, terminal: false });
@@ -120,7 +129,8 @@ export function waitForRedirect(port: number, listen: boolean, input: NodeJS.Rea
     rl.on("line", (line) => {
       const r = parseRedirect(line);
       if (r) done(r);
-      else if (line.trim()) console.error("That is not a Strava redirect URL or code; paste the full URL from the address bar.");
+      else if (line.trim())
+        console.error("That is not a Strava redirect URL or code; paste the full URL from the address bar.");
     });
     if (!listen) return;
     server = createServer((req, res) => {
@@ -132,10 +142,18 @@ export function waitForRedirect(port: number, listen: boolean, input: NodeJS.Rea
         return;
       }
       res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-      res.end("<!doctype html><title>strava-mcp</title><p>Authorized. You can close this tab and return to the terminal.</p>");
+      res.end(
+        "<!doctype html><title>strava-mcp</title><p>Authorized. You can close this tab and return to the terminal.</p>",
+      );
       done(r);
     });
-    server.on("error", (err) => reject(new Error(`Cannot listen on port ${port}: ${err.message}. Use --port, or --no-listen and paste the redirect URL.`)));
+    server.on("error", (err) =>
+      reject(
+        new Error(
+          `Cannot listen on port ${port}: ${err.message}. Use --port, or --no-listen and paste the redirect URL.`,
+        ),
+      ),
+    );
     // All interfaces: in a container the published port forwards here.
     server.listen(port, "0.0.0.0");
   });
@@ -200,14 +218,19 @@ export async function main(argv: string[]): Promise<void> {
     );
   }
   const redirect = await waitForRedirect(o.port, !o.noListen);
-  if (redirect.state && redirect.state !== state) throw new Error("The state parameter does not match this run; start again.");
+  if (redirect.state && redirect.state !== state)
+    throw new Error("The state parameter does not match this run; start again.");
   const missing = missingScopes(o.scopes, redirect.scope);
   const result = await exchangeCode(o, redirect.code, redirect.scope);
   const { athlete, ...tokens } = result;
   writeTokenFile(o.tokenFile, tokens);
-  const who = athlete ? `${[athlete.firstname, athlete.lastname].filter(Boolean).join(" ") || "athlete"} (id ${athlete.id})` : "the athlete";
+  const who = athlete
+    ? `${[athlete.firstname, athlete.lastname].filter(Boolean).join(" ") || "athlete"} (id ${athlete.id})`
+    : "the athlete";
   console.log(`\nAuthorized ${who}. Tokens written to ${o.tokenFile}.`);
   if (missing.length) {
-    console.log(`Note: these scopes were not granted: ${missing.join(", ")}. Run again and leave every box ticked if the tools need them.`);
+    console.log(
+      `Note: these scopes were not granted: ${missing.join(", ")}. Run again and leave every box ticked if the tools need them.`,
+    );
   }
 }

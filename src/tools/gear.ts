@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";

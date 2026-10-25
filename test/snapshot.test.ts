@@ -18,8 +18,17 @@ const fixtures: Array<{ type: string; key: string; body: unknown }> = JSON.parse
 );
 
 function streams(n: number): string {
-  const series = (f: (i: number) => unknown) => ({ data: Array.from({ length: n }, (_, i) => f(i)), series_type: "distance", original_size: n, resolution: "high" });
-  return JSON.stringify({ time: series((i) => i), distance: series((i) => i * 2.5), heartrate: series((i) => 110 + (i % 60)) });
+  const series = (f: (i: number) => unknown) => ({
+    data: Array.from({ length: n }, (_, i) => f(i)),
+    series_type: "distance",
+    original_size: n,
+    resolution: "high",
+  });
+  return JSON.stringify({
+    time: series((i) => i),
+    distance: series((i) => i * 2.5),
+    heartrate: series((i) => 110 + (i % 60)),
+  });
 }
 
 test("publish copies every table, view and comment into a readable snapshot", async () => {
@@ -47,15 +56,29 @@ test("publish copies every table, view and comment into a readable snapshot", as
         const n = (await q<{ n: number }>(`SELECT count(*)::INTEGER AS n FROM "${t.name}"`))[0]!.n;
         assert.equal(n, t.n, `${t.name} rows`);
       }
-      assert.ok(live.some((t) => t.n > 300_000), "the point table spans several row groups");
+      assert.ok(
+        live.some((t) => t.n > 300_000),
+        "the point table spans several row groups",
+      );
       const views = await q<{ view_name: string }>("SELECT view_name FROM duckdb_views() WHERE NOT internal");
       assert.ok(views.some((v) => v.view_name === "raw_current"));
-      const comment = (await q<{ comment: string }>("SELECT comment FROM duckdb_tables() WHERE table_name = 'activity'"))[0]!.comment;
+      const comment = (
+        await q<{ comment: string }>("SELECT comment FROM duckdb_tables() WHERE table_name = 'activity'")
+      )[0]!.comment;
       assert.match(comment, /One row per Strava activity/);
-      const keys = await q<{ table_name: string }>("SELECT table_name FROM duckdb_constraints() WHERE constraint_type = 'PRIMARY KEY'");
-      assert.ok(keys.some((k) => k.table_name === "activity"), "keys of the small tables are kept");
+      const keys = await q<{ table_name: string }>(
+        "SELECT table_name FROM duckdb_constraints() WHERE constraint_type = 'PRIMARY KEY'",
+      );
+      assert.ok(
+        keys.some((k) => k.table_name === "activity"),
+        "keys of the small tables are kept",
+      );
       assert.ok(!keys.some((k) => k.table_name === "activity_stream_point"), "no key on the point table");
-      const body = (await q<{ n: number }>("SELECT strlen(body::VARCHAR)::INTEGER AS n FROM raw_current WHERE object_type = 'activity_streams' AND object_key = '77001'"))[0]!.n;
+      const body = (
+        await q<{ n: number }>(
+          "SELECT strlen(body::VARCHAR)::INTEGER AS n FROM raw_current WHERE object_type = 'activity_streams' AND object_key = '77001'",
+        )
+      )[0]!.n;
       assert.equal(body, streams(300_000).length, "a chunked body reads back whole through the snapshot's raw_current");
     } finally {
       conn.closeSync();

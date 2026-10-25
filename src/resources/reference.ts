@@ -1,18 +1,12 @@
-import { McpServer } from "@modelcontextprotocol/server";
-import {
-  ACTIVITY_STREAM_KEYS,
-  SEGMENT_STREAM_KEYS,
-  SPORT_TYPES,
-  STREAM_TYPE_DESCRIPTIONS,
-} from "../constants.js";
+import type { McpServer } from "@modelcontextprotocol/server";
+import { ACTIVITY_STREAM_KEYS, SEGMENT_STREAM_KEYS, SPORT_TYPES, STREAM_TYPE_DESCRIPTIONS } from "../constants.js";
 
 export function register(server: McpServer): void {
   server.registerResource(
     "sport-types",
     "strava://reference/sport-types",
     {
-      description:
-        "Valid Strava sport_type values for create/update activity and for interpreting activity data.",
+      description: "Valid Strava sport_type values for create/update activity and for interpreting activity data.",
       mimeType: "application/json",
     },
     async (uri) => ({
@@ -30,8 +24,7 @@ export function register(server: McpServer): void {
     "stream-types",
     "strava://reference/stream-types",
     {
-      description:
-        "Available stream types for the stream tools. Pass one or more keys as the keys parameter.",
+      description: "Available stream types for the stream tools. Pass one or more keys as the keys parameter.",
       mimeType: "application/json",
     },
     async (uri) => {
@@ -39,9 +32,7 @@ export function register(server: McpServer): void {
       const streams = ACTIVITY_STREAM_KEYS.map((key) => ({
         key,
         description: STREAM_TYPE_DESCRIPTIONS[key],
-        valid_for: segmentKeys.has(key)
-          ? ["activity", "segment", "segment_effort", "route"]
-          : ["activity"],
+        valid_for: segmentKeys.has(key) ? ["activity", "segment", "segment_effort", "route"] : ["activity"],
       }));
       return {
         contents: [

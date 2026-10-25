@@ -45,7 +45,7 @@ export function safeJsonParse(text: string): unknown {
       i++;
     } else if (ch === "-" || (ch >= "0" && ch <= "9")) {
       let numStr = "";
-      while (i < text.length && /[\d.eE+\-]/.test(text[i])) {
+      while (i < text.length && /[\d.eE+-]/.test(text[i])) {
         numStr += text[i];
         i++;
       }

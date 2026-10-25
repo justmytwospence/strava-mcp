@@ -1,12 +1,7 @@
-import { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
-import {
-  formatDate,
-  formatDistance,
-  formatDuration,
-  formatElevation,
-} from "../format.js";
+import { formatDate, formatDistance, formatDuration, formatElevation } from "../format.js";
 import type { DetailedSegment, SegmentEffort } from "../types.js";
 
 export function register(server: McpServer): void {
@@ -14,12 +9,9 @@ export function register(server: McpServer): void {
     "segment-comparison",
     {
       title: "Segment Effort Comparison",
-      description:
-        "Compare all your efforts on a Strava segment over time to identify trends and improvements.",
+      description: "Compare all your efforts on a Strava segment over time to identify trends and improvements.",
       argsSchema: z.object({
-        segment_id: z
-          .string()
-          .describe("The Strava segment ID to compare efforts on"),
+        segment_id: z.string().describe("The Strava segment ID to compare efforts on"),
       }),
     },
     async ({ segment_id }) => {
@@ -40,22 +32,15 @@ export function register(server: McpServer): void {
         effortsText = "No efforts found for this segment.";
       } else {
         const rows = efforts.map((e) => {
-          const parts = [
-            `  ${formatDate(e.start_date_local)}: ${formatDuration(e.elapsed_time)}`,
-          ];
-          if (e.average_heartrate)
-            parts.push(`    HR: ${e.average_heartrate} avg / ${e.max_heartrate} max`);
+          const parts = [`  ${formatDate(e.start_date_local)}: ${formatDuration(e.elapsed_time)}`];
+          if (e.average_heartrate) parts.push(`    HR: ${e.average_heartrate} avg / ${e.max_heartrate} max`);
           if (e.average_watts) parts.push(`    Power: ${e.average_watts}W avg`);
           if (e.pr_rank) parts.push(`    PR Rank: ${e.pr_rank}`);
           if (e.achievements.length > 0)
-            parts.push(
-              `    Achievements: ${e.achievements.map((a) => a.type).join(", ")}`,
-            );
+            parts.push(`    Achievements: ${e.achievements.map((a) => a.type).join(", ")}`);
           return parts.join("\n");
         });
-        effortsText =
-          `Your ${efforts.length} efforts (newest first):\n` +
-          rows.join("\n\n");
+        effortsText = `Your ${efforts.length} efforts (newest first):\n${rows.join("\n\n")}`;
       }
 
       const text = [

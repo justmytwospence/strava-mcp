@@ -27,7 +27,11 @@ export const FATAL_EXIT_CODE = 70;
  * Exit the process if `err` is fatal for the database. `exit` is injectable for tests
  * and defaults to process.exit.
  */
-export function exitOnFatalDatabaseError(err: unknown, context: string, exit: (code: number) => void = process.exit): void {
+export function exitOnFatalDatabaseError(
+  err: unknown,
+  context: string,
+  exit: (code: number) => void = process.exit,
+): void {
   if (!isFatalDatabaseError(err)) return;
   console.error(
     `${context}: the DuckDB database is no longer usable (${err instanceof Error ? err.message.split("\n")[0] : String(err)}); exiting so that the service restarts and recovers.`,

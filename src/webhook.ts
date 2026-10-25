@@ -9,9 +9,9 @@
  * two seconds, so events are acknowledged first and handled afterwards.
  */
 import { randomBytes } from "node:crypto";
+import { STRAVA_API_BASE } from "./constants.js";
 import type { Database } from "./db/database.js";
 import type { SyncEngine } from "./sync/engine.js";
-import { STRAVA_API_BASE } from "./constants.js";
 
 /** On-demand priority: an event is about something that just changed. */
 const EVENT_PRIORITY = 5;
@@ -67,7 +67,8 @@ export class StravaWebhook {
 
   /** Handle one event. Returns what was queued (for logs and tests). */
   async handle(event: WebhookEvent): Promise<string> {
-    if (this.subscriptionId !== null && event.subscription_id !== this.subscriptionId) return "ignored: other subscription";
+    if (this.subscriptionId !== null && event.subscription_id !== this.subscriptionId)
+      return "ignored: other subscription";
     const athlete = await this.db.one<{ id: number | bigint }>("SELECT id FROM athlete LIMIT 1");
     if (athlete && Number(athlete.id) !== Number(event.owner_id)) return "ignored: other athlete";
     const key = String(event.object_id);
@@ -76,7 +77,8 @@ export class StravaWebhook {
       // A detail re-fetch covers create, edit and delete (a 404 marks the activity deleted);
       // the planner then queues streams, zones and the rest for a new activity.
       await this.engine.enqueue("activity_detail", key, EVENT_PRIORITY, event.event_time);
-      if (event.aspect_type === "create") await this.engine.enqueue("activity_streams", key, EVENT_PRIORITY, event.event_time);
+      if (event.aspect_type === "create")
+        await this.engine.enqueue("activity_streams", key, EVENT_PRIORITY, event.event_time);
       outcome = `queued activity ${key} (${event.aspect_type})`;
     } else if (event.updates?.authorized === "false") {
       outcome = "athlete deauthorized the app";

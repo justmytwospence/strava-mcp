@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { RateLimiter, currentUsage, pathShape } from "../src/sync/rate-limit.js";
 import { splitArray, topLevelId } from "../src/sync/fetchers.js";
+import { currentUsage, pathShape, RateLimiter } from "../src/sync/rate-limit.js";
 
 const T0 = Date.UTC(2026, 9, 22, 12, 5, 0); // 12:05 UTC
 

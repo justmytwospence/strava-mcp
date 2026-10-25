@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { serve } from "@hono/node-server";
 import { createMcpHandler } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import { DEFAULT_DB_PATH } from "./constants.js";
 import { setMirror } from "./context.js";
 import { Database } from "./db/database.js";
 import { createHttpApp } from "./http.js";
@@ -18,11 +19,10 @@ import {
   createServer,
   resolveUnitsFromProfile,
   SERVER_NAME,
-  validateEnv,
   VERSION,
+  validateEnv,
 } from "./server.js";
 import { SnapshotPublisher } from "./snapshot.js";
-import { DEFAULT_DB_PATH } from "./constants.js";
 import { limiter } from "./strava-client.js";
 import { SyncEngine } from "./sync/engine.js";
 import type { Usage } from "./sync/rate-limit.js";
@@ -68,14 +68,21 @@ if (last) {
 }
 limiter.onSample((s) => {
   void db
-    .run(
-      `INSERT INTO rate_sample VALUES ($1::TIMESTAMPTZ, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
-      [
-        s.observedAt.toISOString(), s.method, s.path, s.status, s.priority,
-        s.overall?.usage15 ?? null, s.overall?.usageDay ?? null, s.overall?.limit15 ?? null, s.overall?.limitDay ?? null,
-        s.read?.usage15 ?? null, s.read?.usageDay ?? null, s.read?.limit15 ?? null, s.read?.limitDay ?? null,
-      ],
-    )
+    .run(`INSERT INTO rate_sample VALUES ($1::TIMESTAMPTZ, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`, [
+      s.observedAt.toISOString(),
+      s.method,
+      s.path,
+      s.status,
+      s.priority,
+      s.overall?.usage15 ?? null,
+      s.overall?.usageDay ?? null,
+      s.overall?.limit15 ?? null,
+      s.overall?.limitDay ?? null,
+      s.read?.usage15 ?? null,
+      s.read?.usageDay ?? null,
+      s.read?.limit15 ?? null,
+      s.read?.limitDay ?? null,
+    ])
     .catch((err) => console.error("rate_sample insert failed:", err));
 });
 

@@ -51,7 +51,11 @@ describe("projection", () => {
         "SELECT column_name AS name FROM duckdb_columns() WHERE table_name = $1 ORDER BY column_index",
         [t.name],
       );
-      assert.deepEqual(cols.map((c) => c.name), t.columns.map((c) => c.name), t.name);
+      assert.deepEqual(
+        cols.map((c) => c.name),
+        t.columns.map((c) => c.name),
+        t.name,
+      );
     }
   });
 

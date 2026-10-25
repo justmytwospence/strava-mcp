@@ -73,7 +73,12 @@ export class Mirror {
   }
 
   /** Serve (type, key) from the mirror if younger than maxAgeMs, else fetch it first. */
-  async cached(type: string, key: string, maxAgeMs: number, fetch: () => Promise<FetchResult | unknown>): Promise<Cached> {
+  async cached(
+    type: string,
+    key: string,
+    maxAgeMs: number,
+    fetch: () => Promise<FetchResult | unknown>,
+  ): Promise<Cached> {
     const before = await this.stored(type, key);
     if (before && Date.now() - before.checked_ms <= maxAgeMs) return this.toCached(before, "mirror");
     try {
@@ -119,7 +124,12 @@ export class Mirror {
     }
   }
 
-  async listActivities(q: { before?: number; after?: number; page: number; perPage: number }): Promise<Cached<unknown[]>> {
+  async listActivities(q: {
+    before?: number;
+    after?: number;
+    page: number;
+    perPage: number;
+  }): Promise<Cached<unknown[]>> {
     const meta = await this.freshList();
     // Summaries are small and inline; only an activity without one (created through a
     // tool, not listed yet) needs its detail, which may be chunked.
@@ -227,7 +237,11 @@ export class Mirror {
    * The athlete's efforts on a segment. Every activity detail carries all its efforts,
    * so once the detail backfill is complete the mirror has them all; until then ask Strava.
    */
-  async segmentEfforts(segmentId: string, range: { start?: string; end?: string }, perPage: number): Promise<Cached<unknown[]>> {
+  async segmentEfforts(
+    segmentId: string,
+    range: { start?: string; end?: string },
+    perPage: number,
+  ): Promise<Cached<unknown[]>> {
     const pending = await this.db.one<{ n: number }>(
       "SELECT count(*)::INTEGER AS n FROM sync_job WHERE kind = 'activity_detail'",
     );
@@ -274,7 +288,9 @@ export class Mirror {
   }
 
   async routeStreams(id: string) {
-    return this.cached("route_streams", id, await this.routeAge("route_streams", id), () => this.f.routeStreams(id, this.opts));
+    return this.cached("route_streams", id, await this.routeAge("route_streams", id), () =>
+      this.f.routeStreams(id, this.opts),
+    );
   }
 
   async routeExport(id: string, format: "gpx" | "tcx") {

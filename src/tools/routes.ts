@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
@@ -13,11 +13,13 @@ export function register(server: McpServer): void {
       title: "List Athlete Routes",
       description: "List the authenticated athlete's routes.",
       inputSchema: z.object({
-        athlete_id: z
-          .coerce.number()
+        athlete_id: z.coerce
+          .number()
           .int()
           .optional()
-          .describe("Ignored: Strava serves only the authenticated athlete's routes, which the mirror holds. Kept for compatibility."),
+          .describe(
+            "Ignored: Strava serves only the authenticated athlete's routes, which the mirror holds. Kept for compatibility.",
+          ),
         ...paginationSchema,
       }),
       annotations: READ_ONLY,

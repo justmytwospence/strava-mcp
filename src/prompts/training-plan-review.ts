@@ -1,12 +1,7 @@
-import { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
-import {
-  formatDate,
-  formatDistance,
-  formatDuration,
-  formatElevation,
-} from "../format.js";
+import { formatDate, formatDistance, formatDuration, formatElevation } from "../format.js";
 import type { SummaryActivity } from "../types.js";
 
 export function register(server: McpServer): void {
@@ -14,13 +9,9 @@ export function register(server: McpServer): void {
     "training-plan-review",
     {
       title: "Training Plan Review",
-      description:
-        "Review recent training load and suggest adjustments based on activity history.",
+      description: "Review recent training load and suggest adjustments based on activity history.",
       argsSchema: z.object({
-        days: z
-          .string()
-          .optional()
-          .describe("Number of days to look back (default 30)"),
+        days: z.string().optional().describe("Number of days to look back (default 30)"),
       }),
     },
     async ({ days }) => {
@@ -61,7 +52,7 @@ export function register(server: McpServer): void {
               `  - ${formatDate(a.start_date_local)}: ${a.name} | ${formatDistance(a.distance)} | ${formatDuration(a.moving_time)}`,
           )
           .join("\n");
-        return header + "\n" + list;
+        return `${header}\n${list}`;
       });
 
       const text = [

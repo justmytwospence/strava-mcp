@@ -11,11 +11,7 @@
  */
 import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import {
-  DuckDBConnection,
-  DuckDBInstance,
-  type DuckDBValue,
-} from "@duckdb/node-api";
+import { type DuckDBConnection, DuckDBInstance, type DuckDBValue } from "@duckdb/node-api";
 import { exitOnFatalDatabaseError } from "./fatal.js";
 import { MIGRATIONS } from "./schema.js";
 

@@ -67,7 +67,9 @@ describe("landing large payloads", () => {
       assert.ok(parts.length > 2, `expected several chunks, got ${parts.length}`);
       const { changed } = await db.transaction((tx) => land(tx, "activity_detail", "501", body));
       assert.equal(changed, true);
-      const stored = await db.one<{ body: string | null }>("SELECT body FROM raw_payload WHERE object_type = 'activity_detail' AND object_key = '501'");
+      const stored = await db.one<{ body: string | null }>(
+        "SELECT body FROM raw_payload WHERE object_type = 'activity_detail' AND object_key = '501'",
+      );
       assert.equal(stored!.body, null, "no inline body");
       const chunks = await db.one<{ n: number; bytes: number }>(
         "SELECT count(*)::INTEGER AS n, sum(strlen(part))::INTEGER AS bytes FROM raw_blob WHERE object_key = '501'",
@@ -77,7 +79,10 @@ describe("landing large payloads", () => {
       const row = await db.write((tx) => current(tx, "activity_detail", "501"));
       assert.deepEqual(JSON.parse(row!.body!), JSON.parse(body));
       // The projection read the reassembled body.
-      assert.equal((await db.one<{ n: number }>("SELECT count(*)::INTEGER AS n FROM activity_lap WHERE activity_id = 501"))!.n, 150);
+      assert.equal(
+        (await db.one<{ n: number }>("SELECT count(*)::INTEGER AS n FROM activity_lap WHERE activity_id = 501"))!.n,
+        150,
+      );
       assert.equal((await db.one<{ name: string }>("SELECT name FROM activity WHERE id = 501"))!.name, "Long one");
     } finally {
       db.close();
@@ -91,7 +96,8 @@ describe("landing large payloads", () => {
     try {
       const v1 = bigDetail(502, 120, "First");
       const v2 = bigDetail(502, 120, "Renamed");
-      const chunkCount = () => db.one<{ n: number }>("SELECT count(*)::INTEGER AS n FROM raw_blob WHERE object_key = '502'");
+      const chunkCount = () =>
+        db.one<{ n: number }>("SELECT count(*)::INTEGER AS n FROM raw_blob WHERE object_key = '502'");
       await db.transaction((tx) => land(tx, "activity_detail", "502", v1));
       const after1 = (await chunkCount())!.n;
       assert.equal((await db.transaction((tx) => land(tx, "activity_detail", "502", v1))).changed, false);
@@ -103,7 +109,10 @@ describe("landing large payloads", () => {
       assert.equal((await db.transaction((tx) => land(tx, "activity_detail", "502", v1))).changed, true);
       assert.equal((await chunkCount())!.n, 2 * after1, "a reverted body reuses its version");
       assert.equal((await db.one<{ name: string }>("SELECT name FROM activity WHERE id = 502"))!.name, "First");
-      assert.equal((await db.one<{ n: number }>("SELECT count(*)::INTEGER AS n FROM raw_payload WHERE object_key = '502'"))!.n, 2);
+      assert.equal(
+        (await db.one<{ n: number }>("SELECT count(*)::INTEGER AS n FROM raw_payload WHERE object_key = '502'"))!.n,
+        2,
+      );
     } finally {
       db.close();
       rmSync(dir, { recursive: true, force: true });
@@ -124,24 +133,39 @@ describe("migration from the 3.x layout", () => {
     await conn.run(createTableSql({ ...points, keyEnforced: true }));
     for (const step of MIGRATIONS[0] as string[]) await conn.run(step);
     await conn.run("INSERT INTO schema_migration (version) VALUES (1)");
-    await conn.run("INSERT INTO activity_stream_point (activity_id, idx, heartrate) SELECT 601, range, 120 + range % 40 FROM range(5000)");
+    await conn.run(
+      "INSERT INTO activity_stream_point (activity_id, idx, heartrate) SELECT 601, range, 120 + range % 40 FROM range(5000)",
+    );
     const big = bigDetail(601, 130);
     const small = JSON.stringify({ id: 602, name: "short", sport_type: "Run", athlete: { id: 7 } });
     const unicode = JSON.stringify({ id: 603, name: "\u{1F6B4}".repeat(1500), sport_type: "Run", athlete: { id: 7 } });
-    for (const [key, body] of [["601", big], ["602", small], ["603", unicode]] as const) {
-      await conn.run(
-        "INSERT INTO raw_payload VALUES ('activity_detail', $1, $2, now(), $3::JSON)",
-        [key, `hash-${key}`, body],
-      );
-      await conn.run("INSERT INTO raw_latest VALUES ('activity_detail', $1, 'ok', $2, now(), now())", [key, `hash-${key}`]);
+    for (const [key, body] of [
+      ["601", big],
+      ["602", small],
+      ["603", unicode],
+    ] as const) {
+      await conn.run("INSERT INTO raw_payload VALUES ('activity_detail', $1, $2, now(), $3::JSON)", [
+        key,
+        `hash-${key}`,
+        body,
+      ]);
+      await conn.run("INSERT INTO raw_latest VALUES ('activity_detail', $1, 'ok', $2, now(), now())", [
+        key,
+        `hash-${key}`,
+      ]);
     }
     conn.closeSync();
     instance.closeSync();
 
     const db = await Database.open({ path, snapshotDir: join(dir, "snapshot") });
     try {
-      const versions = (await db.all<{ version: number }>("SELECT version FROM schema_migration ORDER BY version")).map((r) => Number(r.version));
-      assert.deepEqual(versions, MIGRATIONS.map((_, i) => i + 1));
+      const versions = (await db.all<{ version: number }>("SELECT version FROM schema_migration ORDER BY version")).map(
+        (r) => Number(r.version),
+      );
+      assert.deepEqual(
+        versions,
+        MIGRATIONS.map((_, i) => i + 1),
+      );
       const inline = await db.all<{ object_key: string; has_body: boolean }>(
         "SELECT object_key, body IS NOT NULL AS has_body FROM raw_payload ORDER BY object_key",
       );
@@ -150,7 +174,11 @@ describe("migration from the 3.x layout", () => {
         { object_key: "602", has_body: true },
         { object_key: "603", has_body: false },
       ]);
-      for (const [key, body] of [["601", big], ["602", small], ["603", unicode]] as const) {
+      for (const [key, body] of [
+        ["601", big],
+        ["602", small],
+        ["603", unicode],
+      ] as const) {
         const row = await db.write((tx) => current(tx, "activity_detail", key));
         assert.deepEqual(JSON.parse(row!.body!), JSON.parse(body), key);
       }
@@ -159,8 +187,15 @@ describe("migration from the 3.x layout", () => {
         "SELECT 1 FROM duckdb_constraints() WHERE table_name = 'activity_stream_point' AND constraint_type = 'PRIMARY KEY'",
       );
       assert.equal(keyed, undefined);
-      assert.equal((await db.one<{ n: number }>("SELECT count(*)::INTEGER AS n FROM activity_stream_point WHERE activity_id = 601"))!.n, 5000);
-      const comment = await db.one<{ comment: string }>("SELECT comment FROM duckdb_columns() WHERE table_name = 'activity_stream_point' AND column_name = 'heartrate'");
+      assert.equal(
+        (await db.one<{ n: number }>(
+          "SELECT count(*)::INTEGER AS n FROM activity_stream_point WHERE activity_id = 601",
+        ))!.n,
+        5000,
+      );
+      const comment = await db.one<{ comment: string }>(
+        "SELECT comment FROM duckdb_columns() WHERE table_name = 'activity_stream_point' AND column_name = 'heartrate'",
+      );
       assert.match(comment!.comment, /bpm/);
       // Landing continues to work on the migrated mirror.
       await db.transaction((tx) => land(tx, "activity_detail", "601", bigDetail(601, 130, "After")));

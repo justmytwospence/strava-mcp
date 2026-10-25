@@ -1,17 +1,17 @@
-import { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
-import {
-  formatDate,
-  formatDistance,
-  formatDuration,
-  formatElevation,
-  formatPace,
-  getDefaultUnits,
-} from "../format.js";
+import { formatDate, formatDistance, formatDuration, formatElevation, formatPace, getDefaultUnits } from "../format.js";
 import type { DetailedActivity, Stream } from "../types.js";
 
-function formatSplit(s: { split: number; distance: number; moving_time: number; average_speed: number; elevation_difference: number; average_heartrate?: number }): string {
+function formatSplit(s: {
+  split: number;
+  distance: number;
+  moving_time: number;
+  average_speed: number;
+  elevation_difference: number;
+  average_heartrate?: number;
+}): string {
   const parts = [
     `  Split ${s.split}: ${formatDistance(s.distance)} in ${formatDuration(s.moving_time)}`,
     `    Pace: ${formatPace(s.average_speed)} | Elev: ${formatElevation(s.elevation_difference, undefined, true)}`,
@@ -53,7 +53,7 @@ export function register(server: McpServer): void {
             const avg = sum / data.length;
             return `  ${k}: min=${min.toFixed(1)}, max=${max.toFixed(1)}, avg=${avg.toFixed(1)} (${data.length} points)`;
           });
-        streamsText = "\nStream summaries:\n" + streamSummaries.join("\n");
+        streamsText = `\nStream summaries:\n${streamSummaries.join("\n")}`;
       } catch {
         streamsText = "\n(Stream data not available for this activity)";
       }
@@ -66,8 +66,10 @@ export function register(server: McpServer): void {
         `Elevation: ${formatElevation(activity.total_elevation_gain, undefined, true)}`,
         `Calories: ${activity.calories}`,
       ];
-      if (activity.average_heartrate) header.push(`Avg HR: ${activity.average_heartrate} bpm | Max HR: ${activity.max_heartrate} bpm`);
-      if (activity.average_watts) header.push(`Avg Power: ${activity.average_watts}W | Max Power: ${activity.max_watts}W`);
+      if (activity.average_heartrate)
+        header.push(`Avg HR: ${activity.average_heartrate} bpm | Max HR: ${activity.max_heartrate} bpm`);
+      if (activity.average_watts)
+        header.push(`Avg Power: ${activity.average_watts}W | Max Power: ${activity.max_watts}W`);
       if (activity.average_cadence) header.push(`Avg Cadence: ${activity.average_cadence}`);
       if (activity.device_name) header.push(`Device: ${activity.device_name}`);
       if (activity.gear) header.push(`Gear: ${activity.gear.name}`);
@@ -76,7 +78,7 @@ export function register(server: McpServer): void {
       const imperial = getDefaultUnits() === "imperial";
       const splitList = (imperial ? activity.splits_standard : activity.splits_metric) ?? [];
       const splits = splitList.length
-        ? `\n${imperial ? "Mile" : "Kilometer"} splits:\n` + splitList.map(formatSplit).join("\n")
+        ? `\n${imperial ? "Mile" : "Kilometer"} splits:\n${splitList.map(formatSplit).join("\n")}`
         : "";
 
       const efforts = activity.segment_efforts?.length

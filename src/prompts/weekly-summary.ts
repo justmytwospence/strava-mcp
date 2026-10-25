@@ -1,12 +1,7 @@
-import { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
-import {
-  formatDate,
-  formatDistance,
-  formatDuration,
-  formatElevation,
-} from "../format.js";
+import { formatDate, formatDistance, formatDuration, formatElevation } from "../format.js";
 import type { SummaryActivity } from "../types.js";
 
 function getMondayBefore(date: Date): Date {
@@ -34,28 +29,21 @@ export function register(server: McpServer): void {
     "weekly-summary",
     {
       title: "Weekly Training Summary",
-      description:
-        "Summarize training for a given week based on Strava activities.",
+      description: "Summarize training for a given week based on Strava activities.",
       argsSchema: z.object({
-        week_start: z
-          .string()
-          .optional()
-          .describe(
-            "ISO 8601 date for the start of the week (defaults to last Monday)",
-          ),
+        week_start: z.string().optional().describe("ISO 8601 date for the start of the week (defaults to last Monday)"),
       }),
     },
     async ({ week_start }) => {
-      const start = week_start
-        ? new Date(week_start)
-        : getMondayBefore(new Date());
+      const start = week_start ? new Date(week_start) : getMondayBefore(new Date());
       const end = new Date(start);
       end.setDate(end.getDate() + 7);
 
       const after = Math.floor(start.getTime() / 1000);
       const before = Math.floor(end.getTime() / 1000);
 
-      const activities = (await mirror().listActivities({ after, before, page: 1, perPage: 200 })).data as SummaryActivity[];
+      const activities = (await mirror().listActivities({ after, before, page: 1, perPage: 200 }))
+        .data as SummaryActivity[];
 
       const startStr = start.toISOString().split("T")[0];
       const endStr = end.toISOString().split("T")[0];

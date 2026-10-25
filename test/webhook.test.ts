@@ -33,13 +33,23 @@ function fakeStrava(existing: Array<{ id: number; callback_url: string }> = []) 
     const id = Number(url.pathname.split("/").pop());
     if (method === "GET") return Response.json(subs);
     if (method === "DELETE") {
-      subs.splice(subs.findIndex((s) => s.id === id), 1);
+      subs.splice(
+        subs.findIndex((s) => s.id === id),
+        1,
+      );
       return new Response(null, { status: 204 });
     }
     // Strava validates the callback before creating the subscription.
     const form = new URLSearchParams(String(init?.body));
-    const check = webhook!.validate(new URLSearchParams({ "hub.mode": "subscribe", "hub.challenge": "c1", "hub.verify_token": form.get("verify_token")! }));
-    if (check.status !== 200 || check.body["hub.challenge"] !== "c1") return new Response("callback not verified", { status: 400 });
+    const check = webhook!.validate(
+      new URLSearchParams({
+        "hub.mode": "subscribe",
+        "hub.challenge": "c1",
+        "hub.verify_token": form.get("verify_token")!,
+      }),
+    );
+    if (check.status !== 200 || check.body["hub.challenge"] !== "c1")
+      return new Response("callback not verified", { status: 400 });
     subs.push({ id: 99, callback_url: form.get("callback_url")! });
     return Response.json({ id: 99 }, { status: 201 });
   }) as typeof fetch;
@@ -51,7 +61,8 @@ async function registered(api: ReturnType<typeof fakeStrava>) {
   const w = new StravaWebhook(db, engine, CALLBACK, { clientId: "1", clientSecret: "x" }, api.http);
   api.bind(w);
   w.start();
-  for (let i = 0; i < 50 && !w.active && (await w.status()).state === "registering"; i++) await new Promise((r) => setTimeout(r, 10));
+  for (let i = 0; i < 50 && !w.active && (await w.status()).state === "registering"; i++)
+    await new Promise((r) => setTimeout(r, 10));
   return { w, engine };
 }
 
@@ -78,7 +89,11 @@ test("reuses our subscription and replaces one that points elsewhere", async () 
 
 test("rejects a validation with the wrong token", () => {
   const w = new StravaWebhook(db, new SyncEngine(db), CALLBACK, { clientId: "1", clientSecret: "x" });
-  assert.equal(w.validate(new URLSearchParams({ "hub.mode": "subscribe", "hub.challenge": "c", "hub.verify_token": "nope" })).status, 403);
+  assert.equal(
+    w.validate(new URLSearchParams({ "hub.mode": "subscribe", "hub.challenge": "c", "hub.verify_token": "nope" }))
+      .status,
+    403,
+  );
   assert.equal(w.path, "/webhook/s3cret");
 });
 
@@ -86,14 +101,33 @@ test("events queue re-fetches; foreign events are ignored", async () => {
   const api = fakeStrava();
   const { w } = await registered(api);
   const ev = (o: Partial<WebhookEvent>): WebhookEvent => ({
-    object_type: "activity", object_id: 555, aspect_type: "create", owner_id: 42, subscription_id: 99, event_time: 1_800_000_000, ...o,
+    object_type: "activity",
+    object_id: 555,
+    aspect_type: "create",
+    owner_id: 42,
+    subscription_id: 99,
+    event_time: 1_800_000_000,
+    ...o,
   });
   assert.match(await w.handle(ev({})), /queued activity 555/);
-  const jobs = await db.all<{ kind: string; priority: number }>("SELECT kind, priority FROM sync_job WHERE key = '555' ORDER BY kind");
-  assert.deepEqual(jobs.map((j) => [j.kind, j.priority]), [["activity_detail", 5], ["activity_streams", 5]]);
+  const jobs = await db.all<{ kind: string; priority: number }>(
+    "SELECT kind, priority FROM sync_job WHERE key = '555' ORDER BY kind",
+  );
+  assert.deepEqual(
+    jobs.map((j) => [j.kind, j.priority]),
+    [
+      ["activity_detail", 5],
+      ["activity_streams", 5],
+    ],
+  );
   assert.equal(await w.handle(ev({ owner_id: 1 })), "ignored: other athlete");
   assert.equal(await w.handle(ev({ subscription_id: 1 })), "ignored: other subscription");
-  assert.equal(await w.handle(ev({ object_type: "athlete", object_id: 42, aspect_type: "update", updates: { authorized: "false" } })), "athlete deauthorized the app");
+  assert.equal(
+    await w.handle(
+      ev({ object_type: "athlete", object_id: 42, aspect_type: "update", updates: { authorized: "false" } }),
+    ),
+    "athlete deauthorized the app",
+  );
   assert.equal((await w.status()).events_24h, 2);
   w.stop();
 });
@@ -101,7 +135,9 @@ test("events queue re-fetches; foreign events are ignored", async () => {
 test("an active subscription slows the activity-list poll to a safety net", async () => {
   const engine = new SyncEngine(db);
   await db.run("DELETE FROM sync_job");
-  await db.run("INSERT OR REPLACE INTO sync_state (name, value, updated_at) VALUES ('last:list_recent', $1, now())", [new Date(Date.now() - 30 * 60_000).toISOString()]);
+  await db.run("INSERT OR REPLACE INTO sync_state (name, value, updated_at) VALUES ('last:list_recent', $1, now())", [
+    new Date(Date.now() - 30 * 60_000).toISOString(),
+  ]);
   engine.setPushActive(true);
   await engine.schedule();
   assert.equal((await db.all("SELECT 1 FROM sync_job WHERE kind = 'list_recent'")).length, 0);

@@ -70,7 +70,10 @@ async function store(tx: Tx, type: string, key: string, body: string, at: Date):
   if (!prev || prev.content_hash !== hash) {
     // The same content may have been stored before (an edit that was reverted), in
     // which case the existing row and its chunks are kept.
-    const known = await tx.one("SELECT 1 FROM raw_payload WHERE object_type = $1 AND object_key = $2 AND content_hash = $3", [type, key, hash]);
+    const known = await tx.one(
+      "SELECT 1 FROM raw_payload WHERE object_type = $1 AND object_key = $2 AND content_hash = $3",
+      [type, key, hash],
+    );
     if (!known) {
       const parts = chunkBody(body);
       await tx.run(

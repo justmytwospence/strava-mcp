@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
@@ -51,11 +51,13 @@ export function register(server: McpServer): void {
       description:
         "Get activity statistics for the authenticated athlete: recent, year-to-date, and all-time totals for runs, rides, and swims. Includes biggest ride distance and biggest climb.",
       inputSchema: z.object({
-        athlete_id: z
-          .coerce.number()
+        athlete_id: z.coerce
+          .number()
           .int()
           .optional()
-          .describe("Ignored: Strava serves stats only for the authenticated athlete, which the mirror holds. Kept for compatibility."),
+          .describe(
+            "Ignored: Strava serves stats only for the authenticated athlete, which the mirror holds. Kept for compatibility.",
+          ),
       }),
       annotations: READ_ONLY,
     },

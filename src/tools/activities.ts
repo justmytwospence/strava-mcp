@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { SPORT_TYPES } from "../constants.js";
 import { mirror } from "../context.js";
@@ -43,7 +43,9 @@ export function register(server: McpServer): void {
         include_all_efforts: z
           .boolean()
           .optional()
-          .describe("Ignored: the mirror stores every segment effort and always returns them all. Kept for compatibility."),
+          .describe(
+            "Ignored: the mirror stores every segment effort and always returns them all. Kept for compatibility.",
+          ),
       }),
       annotations: READ_ONLY,
     },

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { FATAL_EXIT_CODE, exitOnFatalDatabaseError, isFatalDatabaseError } from "../src/db/fatal.js";
+import { exitOnFatalDatabaseError, FATAL_EXIT_CODE, isFatalDatabaseError } from "../src/db/fatal.js";
 
 describe("fatal DuckDB errors", () => {
   test("recognizes the messages DuckDB uses once the database is unusable", () => {
@@ -18,8 +18,8 @@ describe("fatal DuckDB errors", () => {
     for (const m of [
       "Constraint Error: Duplicate key",
       "Out of Memory Error: failed to allocate data of size 8.0 MiB",
-      "Parser Error: syntax error at or near \"FROM\"",
-      "Binder Error: Referenced column \"x\" not found",
+      'Parser Error: syntax error at or near "FROM"',
+      'Binder Error: Referenced column "x" not found',
       "INTERRUPT Error: Interrupted!",
     ]) {
       assert.equal(isFatalDatabaseError(new Error(m)), false, m);
@@ -36,7 +36,11 @@ describe("fatal DuckDB errors", () => {
     const logged: string[] = [];
     console.error = (...args: unknown[]) => void logged.push(args.join(" "));
     try {
-      exitOnFatalDatabaseError(new Error("FATAL Error: Failed to rollback transaction. Cannot continue operation"), "sync", exit);
+      exitOnFatalDatabaseError(
+        new Error("FATAL Error: Failed to rollback transaction. Cannot continue operation"),
+        "sync",
+        exit,
+      );
     } finally {
       console.error = log;
     }

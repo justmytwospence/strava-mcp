@@ -1,14 +1,13 @@
-import { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { mirror } from "../context.js";
-import type { DetailedAthlete, AthleteStats } from "../types.js";
+import type { AthleteStats, DetailedAthlete } from "../types.js";
 
 export function register(server: McpServer): void {
   server.registerResource(
     "athlete-profile",
     "strava://athlete/profile",
     {
-      description:
-        "Current authenticated athlete profile including name, location, bikes, and shoes.",
+      description: "Current authenticated athlete profile including name, location, bikes, and shoes.",
       mimeType: "application/json",
     },
     async (uri) => {
@@ -29,8 +28,7 @@ export function register(server: McpServer): void {
     "athlete-stats",
     "strava://athlete/stats",
     {
-      description:
-        "Year-to-date and all-time activity totals for runs, rides, and swims.",
+      description: "Year-to-date and all-time activity totals for runs, rides, and swims.",
       mimeType: "application/json",
     },
     async (uri) => {

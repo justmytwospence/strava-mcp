@@ -36,7 +36,17 @@ interface Entity {
 /** Logical joins: [child, column, parent, label]. */
 type Join = [string, string, string, string | null];
 
-const RAW_TABLES = ["raw_payload", "raw_blob", "raw_latest", "raw_current", "sync_job", "sync_log", "sync_state", "rate_sample", "schema_migration"];
+const RAW_TABLES = [
+  "raw_payload",
+  "raw_blob",
+  "raw_latest",
+  "raw_current",
+  "sync_job",
+  "sync_log",
+  "sync_state",
+  "rate_sample",
+  "schema_migration",
+];
 
 /** Keys of the tables that are not generated from tables.ts. */
 const RAW_KEYS: Record<string, string[]> = {
@@ -53,7 +63,12 @@ const RAW_KEYS: Record<string, string[]> = {
 function joins(entities: Entity[]): Join[] {
   const out: Join[] = [];
   for (const e of entities) {
-    if (e.name !== "activity" && e.name !== "activity_zone_bucket" && e.columns.some((c) => c.name === "activity_id") && !RAW_TABLES.includes(e.name)) {
+    if (
+      e.name !== "activity" &&
+      e.name !== "activity_zone_bucket" &&
+      e.columns.some((c) => c.name === "activity_id") &&
+      !RAW_TABLES.includes(e.name)
+    ) {
       out.push([e.name, "activity_id", "activity", null]);
     }
   }
@@ -126,8 +141,24 @@ async function main(): Promise<void> {
     );
     const typedKeys = new Map(TABLES.map((t) => [t.name, t.primaryKey]));
     const entities: Entity[] = [
-      ...tables.map((t): Entity => ({ name: t.name, kind: "table", comment: t.comment, columns: columns.filter((c) => c.table === t.name), key: typedKeys.get(t.name) ?? RAW_KEYS[t.name] ?? [] })),
-      ...views.map((v): Entity => ({ name: v.name, kind: "view", comment: v.comment, columns: columns.filter((c) => c.table === v.name), key: RAW_KEYS[v.name] ?? [] })),
+      ...tables.map(
+        (t): Entity => ({
+          name: t.name,
+          kind: "table",
+          comment: t.comment,
+          columns: columns.filter((c) => c.table === t.name),
+          key: typedKeys.get(t.name) ?? RAW_KEYS[t.name] ?? [],
+        }),
+      ),
+      ...views.map(
+        (v): Entity => ({
+          name: v.name,
+          kind: "view",
+          comment: v.comment,
+          columns: columns.filter((c) => c.table === v.name),
+          key: RAW_KEYS[v.name] ?? [],
+        }),
+      ),
     ];
     const allJoins = joins(entities);
     const domain = entities.filter((e) => !RAW_TABLES.includes(e.name)).map((e) => e.name);

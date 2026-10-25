@@ -1,5 +1,5 @@
 import { type DuckDBConnection, StatementType } from "@duckdb/node-api";
-import { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
 import { exitOnFatalDatabaseError } from "../db/fatal.js";
@@ -21,7 +21,10 @@ function reader(): Promise<DuckDBConnection> {
  * DESCRIBE, SHOW, SUMMARIZE, PRAGMA table_info, FROM-first queries) and EXPLAIN are
  * accepted; file access from SQL is disabled for the whole database.
  */
-export async function runReadOnly(sql: string, maxRows: number): Promise<{ columns: string[]; rows: unknown[]; truncated: boolean }> {
+export async function runReadOnly(
+  sql: string,
+  maxRows: number,
+): Promise<{ columns: string[]; rows: unknown[]; truncated: boolean }> {
   const conn = await reader();
   const extracted = await conn.extractStatements(sql);
   if (extracted.count !== 1) throw new Error(`Send exactly one statement (got ${extracted.count}).`);
@@ -57,7 +60,13 @@ export function register(server: McpServer): void {
         "Units: meters, seconds, m/s. raw_current holds every payload as JSON (column body) for fields not in a typed table. Costs no Strava API calls.",
       inputSchema: z.object({
         sql: z.string().describe("One DuckDB SELECT statement (DESCRIBE, SUMMARIZE and EXPLAIN also work)."),
-        max_rows: z.coerce.number().int().min(1).max(5000).default(200).describe("Maximum rows to return (default 200)."),
+        max_rows: z.coerce
+          .number()
+          .int()
+          .min(1)
+          .max(5000)
+          .default(200)
+          .describe("Maximum rows to return (default 200)."),
       }),
       annotations: LOCAL_READ_ONLY,
     },
@@ -105,7 +114,8 @@ export function register(server: McpServer): void {
            WHERE schema_name = 'main' AND table_name = $1 ORDER BY column_index`,
           [table],
         );
-        if (columns.length === 0) return textResult(`No table or view named ${table}. Call strava_schema without arguments to list them.`);
+        if (columns.length === 0)
+          return textResult(`No table or view named ${table}. Call strava_schema without arguments to list them.`);
         const meta = await db.one(
           `SELECT comment FROM duckdb_tables() WHERE schema_name = 'main' AND table_name = $1
            UNION ALL SELECT comment FROM duckdb_views() WHERE schema_name = 'main' AND view_name = $1`,

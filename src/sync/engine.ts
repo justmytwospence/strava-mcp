@@ -17,8 +17,8 @@
  * backfill.
  */
 import type { Database } from "../db/database.js";
-import { RateLimitWaitError, limiter } from "../strava-client.js";
 import { StravaApiError } from "../errors.js";
+import { limiter, RateLimitWaitError } from "../strava-client.js";
 import { DAY, HOUR, MINUTE, SECOND } from "../time.js";
 import { Fetchers } from "./fetchers.js";
 import type { Priority } from "./rate-limit.js";
@@ -95,11 +95,13 @@ const PLAN: string[] = [
    WHERE a.deleted_at IS NULL AND (a.has_heartrate OR a.device_watts OR a.average_watts IS NOT NULL)
      AND NOT EXISTS (SELECT 1 FROM raw_latest r WHERE r.object_type = 'activity_zones' AND r.object_key = a.id::VARCHAR)`,
   // Social: fetched when the count on the activity differs from what is stored.
-  ...([
-    ["activity_kudos", "kudos_count"],
-    ["activity_comments", "comment_count"],
-    ["activity_photos", "total_photo_count"],
-  ] as const).map(
+  ...(
+    [
+      ["activity_kudos", "kudos_count"],
+      ["activity_comments", "comment_count"],
+      ["activity_photos", "total_photo_count"],
+    ] as const
+  ).map(
     ([type, count]) =>
       `SELECT '${type}', a.id::VARCHAR, CASE WHEN ${RECENT} THEN 12 ELSE 30 END, epoch(a.start_date)::BIGINT
        FROM activity a
@@ -188,7 +190,10 @@ export class SyncEngine {
   /** Queue the periodic tasks that are due. */
   async schedule(): Promise<void> {
     const state = new Map(
-      (await this.db.all<{ name: string; value: string }>("SELECT name, value FROM sync_state")).map((r) => [r.name, r.value]),
+      (await this.db.all<{ name: string; value: string }>("SELECT name, value FROM sync_state")).map((r) => [
+        r.name,
+        r.value,
+      ]),
     );
     const hasActivities = await this.db.one<{ n: number }>("SELECT count(*)::INTEGER AS n FROM activity");
     for (const task of PERIODIC) {
@@ -204,10 +209,10 @@ export class SyncEngine {
   }
 
   private async markRan(kind: string): Promise<void> {
-    await this.db.run(
-      "INSERT OR REPLACE INTO sync_state (name, value, updated_at) VALUES ($1, $2, now())",
-      [`last:${kind}`, new Date().toISOString()],
-    );
+    await this.db.run("INSERT OR REPLACE INTO sync_state (name, value, updated_at) VALUES ($1, $2, now())", [
+      `last:${kind}`,
+      new Date().toISOString(),
+    ]);
   }
 
   private async nextJob(): Promise<Job | undefined> {

@@ -1,4 +1,4 @@
-import { McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
+import { type McpServer, ResourceTemplate } from "@modelcontextprotocol/server";
 import { mirror } from "../context.js";
 
 export function register(server: McpServer): void {

@@ -12,7 +12,12 @@ import { Database } from "../src/db/database.js";
 import { land } from "../src/db/raw.js";
 
 function streams(n: number): string {
-  const series = (f: (i: number) => unknown) => ({ data: Array.from({ length: n }, (_, i) => f(i)), series_type: "distance", original_size: n, resolution: "high" });
+  const series = (f: (i: number) => unknown) => ({
+    data: Array.from({ length: n }, (_, i) => f(i)),
+    series_type: "distance",
+    original_size: n,
+    resolution: "high",
+  });
   return JSON.stringify({
     time: series((i) => i),
     distance: series((i) => i * 3.217),
@@ -35,7 +40,12 @@ test("projecting one activity does not read every stored stream payload", async 
     const body = streams(30_000);
     for (let i = 0; i < 60; i++) await db.transaction((tx) => land(tx, "activity_streams", String(1000 + i), body));
     await db.close();
-    const small = await Database.open({ path: join(dir, "strava.duckdb"), snapshotDir: join(dir, "snapshot"), memoryLimit: "256MB", threads: 2 });
+    const small = await Database.open({
+      path: join(dir, "strava.duckdb"),
+      snapshotDir: join(dir, "snapshot"),
+      memoryLimit: "256MB",
+      threads: 2,
+    });
     try {
       await small.transaction((tx) => land(tx, "activity_streams", "999", body));
       const rows = await small.all("SELECT count(*)::INT AS n FROM activity_stream_point WHERE activity_id = 999");
@@ -50,13 +60,22 @@ test("projecting one activity does not read every stored stream payload", async 
 
 test("a long activity's streams land under a 256 MB memory limit", async () => {
   const dir = mkdtempSync(join(tmpdir(), "strava-mem-"));
-  const db = await Database.open({ path: join(dir, "strava.duckdb"), snapshotDir: join(dir, "snapshot"), memoryLimit: "256MB", threads: 2 });
+  const db = await Database.open({
+    path: join(dir, "strava.duckdb"),
+    snapshotDir: join(dir, "snapshot"),
+    memoryLimit: "256MB",
+    threads: 2,
+  });
   try {
     const body = streams(60_000);
     await db.transaction((tx) => land(tx, "activity_streams", "123", body));
-    const rows = await db.all("SELECT count(*)::INT AS n, count(heartrate)::INT AS hr, count(lat)::INT AS lat FROM activity_stream_point WHERE activity_id = 123");
+    const rows = await db.all(
+      "SELECT count(*)::INT AS n, count(heartrate)::INT AS hr, count(lat)::INT AS lat FROM activity_stream_point WHERE activity_id = 123",
+    );
     assert.deepEqual(rows[0], { n: 60_000, hr: 60_000, lat: 60_000 });
-    const meta = await db.all("SELECT count(*)::INT AS n, min(original_size)::INT AS size, min(resolution) AS res FROM activity_stream_meta WHERE activity_id = 123");
+    const meta = await db.all(
+      "SELECT count(*)::INT AS n, min(original_size)::INT AS size, min(resolution) AS res FROM activity_stream_meta WHERE activity_id = 123",
+    );
     assert.deepEqual(meta[0], { n: 11, size: 60_000, res: "high" });
   } finally {
     await db.close();

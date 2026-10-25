@@ -4,10 +4,7 @@ import type { Provenance } from "./mirror.js";
 export function textResult(text: string): {
   content: Array<{ type: "text"; text: string }>;
 } {
-  const truncated =
-    text.length > CHARACTER_LIMIT
-      ? text.slice(0, CHARACTER_LIMIT) + "\n\n[Response truncated]"
-      : text;
+  const truncated = text.length > CHARACTER_LIMIT ? `${text.slice(0, CHARACTER_LIMIT)}\n\n[Response truncated]` : text;
   return { content: [{ type: "text", text: truncated }] };
 }
 
@@ -34,10 +31,7 @@ export function getDefaultUnits(): Units {
   return defaultUnits;
 }
 
-export function formatDistance(
-  meters: number,
-  units: Units = defaultUnits,
-): string {
+export function formatDistance(meters: number, units: Units = defaultUnits): string {
   if (units === "imperial") {
     const miles = meters / METERS_PER_MILE;
     if (miles >= 0.1) {
@@ -64,10 +58,7 @@ export function formatDuration(seconds: number): string {
   return `${s}s`;
 }
 
-export function formatPace(
-  metersPerSecond: number,
-  units: Units = defaultUnits,
-): string {
+export function formatPace(metersPerSecond: number, units: Units = defaultUnits): string {
   if (metersPerSecond <= 0) return "N/A";
   const distance = units === "imperial" ? METERS_PER_MILE : 1000;
   const label = units === "imperial" ? "/mi" : "/km";
@@ -78,20 +69,13 @@ export function formatPace(
 }
 
 /** An elevation or elevation gain; pass `signed` to keep a leading + for differences. */
-export function formatElevation(
-  meters: number,
-  units: Units = defaultUnits,
-  signed = false,
-): string {
+export function formatElevation(meters: number, units: Units = defaultUnits, signed = false): string {
   const value = units === "imperial" ? Math.round(meters / METERS_PER_FOOT) : Math.round(meters);
   const sign = signed && value > 0 ? "+" : "";
   return `${sign}${value} ${units === "imperial" ? "ft" : "m"}`;
 }
 
-export function formatWeight(
-  kilograms: number,
-  units: Units = defaultUnits,
-): string {
+export function formatWeight(kilograms: number, units: Units = defaultUnits): string {
   if (units === "imperial") {
     return `${Math.round(kilograms / KILOGRAMS_PER_POUND)} lb`;
   }
@@ -124,7 +108,10 @@ export function provenanceText(meta: Provenance): string {
 }
 
 /** jsonResult plus a provenance line. */
-export function mirrorResult(data: unknown, meta: Provenance): {
+export function mirrorResult(
+  data: unknown,
+  meta: Provenance,
+): {
   content: Array<{ type: "text"; text: string }>;
 } {
   const result = jsonResult(data);

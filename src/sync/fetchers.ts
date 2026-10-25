@@ -22,7 +22,8 @@ export interface FetchOptions {
   maxWaitMs?: number;
 }
 
-const ALL_STREAM_KEYS = "time,distance,latlng,altitude,velocity_smooth,heartrate,cadence,watts,temp,moving,grade_smooth";
+const ALL_STREAM_KEYS =
+  "time,distance,latlng,altitude,velocity_smooth,heartrate,cadence,watts,temp,moving,grade_smooth";
 const PAGE = 200;
 
 /**
@@ -92,11 +93,14 @@ export function topLevelId(objectText: string): string | null {
   return null;
 }
 
-
 export class Fetchers {
   constructor(private readonly db: Database) {}
 
-  private async get(path: string, params: Record<string, unknown> | undefined, opts: FetchOptions): Promise<string | null> {
+  private async get(
+    path: string,
+    params: Record<string, unknown> | undefined,
+    opts: FetchOptions,
+  ): Promise<string | null> {
     try {
       const { text } = await requestRaw("GET", path, { params, priority: opts.priority, maxWaitMs: opts.maxWaitMs });
       return text;
@@ -107,7 +111,13 @@ export class Fetchers {
   }
 
   /** Fetch one object and land it under (type, key). */
-  private async one(type: string, key: string, path: string, params: Record<string, unknown> | undefined, opts: FetchOptions): Promise<FetchResult> {
+  private async one(
+    type: string,
+    key: string,
+    path: string,
+    params: Record<string, unknown> | undefined,
+    opts: FetchOptions,
+  ): Promise<FetchResult> {
     const text = await this.get(path, params, opts);
     if (text === null) {
       await this.db.transaction((tx) => markNotFound(tx, type, key));
@@ -118,7 +128,12 @@ export class Fetchers {
   }
 
   /** Fetch every page of a list endpoint; returns the elements' raw text. */
-  private async pages(path: string, params: Record<string, unknown>, opts: FetchOptions, pageParam = "page"): Promise<string[]> {
+  private async pages(
+    path: string,
+    params: Record<string, unknown>,
+    opts: FetchOptions,
+    pageParam = "page",
+  ): Promise<string[]> {
     const items: string[] = [];
     for (let page = 1; ; page++) {
       const text = await this.get(path, { ...params, per_page: PAGE, [pageParam]: page }, opts);
@@ -131,7 +146,12 @@ export class Fetchers {
   }
 
   /** Land a list as one payload (`type`, key 'self'), e.g. the starred segments. */
-  private async list(type: string, path: string, params: Record<string, unknown>, opts: FetchOptions): Promise<FetchResult & { items: string[] }> {
+  private async list(
+    type: string,
+    path: string,
+    params: Record<string, unknown>,
+    opts: FetchOptions,
+  ): Promise<FetchResult & { items: string[] }> {
     const items = await this.pages(path, params, opts);
     const body = `[${items.join(",")}]`;
     const { changed } = await this.db.transaction((tx) => land(tx, type, "self", body));
@@ -201,7 +221,13 @@ export class Fetchers {
   }
 
   activityStreams(id: string, opts: FetchOptions) {
-    return this.one("activity_streams", id, `/activities/${id}/streams`, { keys: ALL_STREAM_KEYS, key_by_type: true }, opts);
+    return this.one(
+      "activity_streams",
+      id,
+      `/activities/${id}/streams`,
+      { keys: ALL_STREAM_KEYS, key_by_type: true },
+      opts,
+    );
   }
 
   activityZones(id: string, opts: FetchOptions) {
@@ -236,7 +262,13 @@ export class Fetchers {
   }
 
   segmentStreams(id: string, opts: FetchOptions) {
-    return this.one("segment_streams", id, `/segments/${id}/streams`, { keys: "distance,latlng,altitude", key_by_type: true }, opts);
+    return this.one(
+      "segment_streams",
+      id,
+      `/segments/${id}/streams`,
+      { keys: "distance,latlng,altitude", key_by_type: true },
+      opts,
+    );
   }
 
   starredSegments(opts: FetchOptions) {
@@ -244,7 +276,11 @@ export class Fetchers {
   }
 
   /** Efforts on a segment (subscription feature); each is landed individually. */
-  async segmentEfforts(segmentId: string, range: { start?: string; end?: string }, opts: FetchOptions): Promise<string[]> {
+  async segmentEfforts(
+    segmentId: string,
+    range: { start?: string; end?: string },
+    opts: FetchOptions,
+  ): Promise<string[]> {
     const params: Record<string, unknown> = { segment_id: segmentId };
     if (range.start) params.start_date_local = range.start;
     if (range.end) params.end_date_local = range.end;
@@ -259,7 +295,13 @@ export class Fetchers {
   }
 
   segmentEffortStreams(id: string, opts: FetchOptions) {
-    return this.one("segment_effort_streams", id, `/segment_efforts/${id}/streams`, { keys: ALL_STREAM_KEYS, key_by_type: true }, opts);
+    return this.one(
+      "segment_effort_streams",
+      id,
+      `/segment_efforts/${id}/streams`,
+      { keys: ALL_STREAM_KEYS, key_by_type: true },
+      opts,
+    );
   }
 
   async routes(opts: FetchOptions) {

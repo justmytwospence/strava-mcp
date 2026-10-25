@@ -52,7 +52,12 @@ export function expr(name: string, type: string, comment: string, sql: string, k
   return { name, type, comment, expr: sql, key };
 }
 
-const fetchedAt = expr("fetched_at", "TIMESTAMPTZ", "When this row's source payload was fetched from Strava.", "src.fetched_at");
+const fetchedAt = expr(
+  "fetched_at",
+  "TIMESTAMPTZ",
+  "When this row's source payload was fetched from Strava.",
+  "src.fetched_at",
+);
 
 // ---------------------------------------------------------------------------------
 // Activities
@@ -65,7 +70,11 @@ const activitySummaryColumns: Column[] = [
   col("name", "VARCHAR", "Activity title."),
   col("sport_type", "VARCHAR", "Sport type (Run, Ride, TrailRun, ...); the precise successor of `type`."),
   col("type", "VARCHAR", "Legacy activity type (deprecated by Strava in favor of sport_type)."),
-  col("workout_type", "INTEGER", "Workout tag: run 0 default, 1 race, 2 long run, 3 workout; ride 10 default, 11 race, 12 workout."),
+  col(
+    "workout_type",
+    "INTEGER",
+    "Workout tag: run 0 default, 1 race, 2 long run, 3 workout; ride 10 default, 11 race, 12 workout.",
+  ),
   col("start_date", "TIMESTAMPTZ", "Start time (UTC)."),
   col("start_date_local", "TIMESTAMP", "Start time in the activity's local time zone (wall clock)."),
   col("timezone", "VARCHAR", "Strava time zone label, e.g. '(GMT-07:00) America/Denver'."),
@@ -108,7 +117,11 @@ const activitySummaryColumns: Column[] = [
   col("has_kudoed", "BOOLEAN", "Whether the authenticated athlete kudoed it."),
   col("gear_id", "VARCHAR", "Gear used (references gear.id)."),
   col("device_name", "VARCHAR", "Recording device, e.g. 'Garmin Fenix 7'."),
-  col("external_id", "VARCHAR", "Identifier from the upload source (Garmin: garmin_ping_<id>, not the Garmin activity id)."),
+  col(
+    "external_id",
+    "VARCHAR",
+    "Identifier from the upload source (Garmin: garmin_ping_<id>, not the Garmin activity id).",
+  ),
   col("upload_id", "BIGINT", "Upload id (the bulk export names original files by it)."),
   col("upload_id_str", "VARCHAR", "Upload id as a string."),
   col("start_latlng", "DOUBLE[]", "Start [lat, lng]."),
@@ -147,15 +160,36 @@ const activityTable: Table = {
   columns: [
     ...activitySummaryColumns,
     ...activityDetailColumns.map((c) => ({ ...c, expr: c.expr.replace(/\bb->/g, "d->") })),
-    expr("summary_fetched_at", "TIMESTAMPTZ", "When the newest list (summary) payload was fetched.", "src.summary_fetched_at"),
-    expr("detail_fetched_at", "TIMESTAMPTZ", "When the detail payload was fetched; null if never.", "src.detail_fetched_at"),
-    expr("deleted_at", "TIMESTAMPTZ", "When the activity was found deleted on Strava; null while it exists.", "src.deleted_at"),
+    expr(
+      "summary_fetched_at",
+      "TIMESTAMPTZ",
+      "When the newest list (summary) payload was fetched.",
+      "src.summary_fetched_at",
+    ),
+    expr(
+      "detail_fetched_at",
+      "TIMESTAMPTZ",
+      "When the detail payload was fetched; null if never.",
+      "src.detail_fetched_at",
+    ),
+    expr(
+      "deleted_at",
+      "TIMESTAMPTZ",
+      "When the activity was found deleted on Strava; null while it exists.",
+      "src.deleted_at",
+    ),
   ],
 };
 
 const segmentEffortColumns: Column[] = [
   col("id", "BIGINT", "Segment effort id."),
-  expr("activity_id", "BIGINT", "Activity the effort belongs to.", "TRY_CAST(b->'activity'->>'id' AS BIGINT)", "activity"),
+  expr(
+    "activity_id",
+    "BIGINT",
+    "Activity the effort belongs to.",
+    "TRY_CAST(b->'activity'->>'id' AS BIGINT)",
+    "activity",
+  ),
   expr("segment_id", "BIGINT", "Segment ridden or run.", "TRY_CAST(b->'segment'->>'id' AS BIGINT)", "segment"),
   expr("athlete_id", "BIGINT", "Athlete id.", "TRY_CAST(b->'athlete'->>'id' AS BIGINT)", "athlete"),
   col("name", "VARCHAR", "Segment name at the time of the effort."),
@@ -297,7 +331,12 @@ const photoColumns: Column[] = [
 
 const streamMetaColumns: Column[] = [
   expr("activity_id", "BIGINT", "Activity id.", "src.activity_id"),
-  expr("stream_type", "VARCHAR", "Stream key: time, distance, latlng, altitude, velocity_smooth, heartrate, cadence, watts, temp, moving, grade_smooth.", "src.stream_type"),
+  expr(
+    "stream_type",
+    "VARCHAR",
+    "Stream key: time, distance, latlng, altitude, velocity_smooth, heartrate, cadence, watts, temp, moving, grade_smooth.",
+    "src.stream_type",
+  ),
   col("original_size", "INTEGER", "Number of points Strava holds for the stream."),
   col("resolution", "VARCHAR", "Resolution label Strava reports (high = full)."),
   col("series_type", "VARCHAR", "What the stream is indexed by (time or distance)."),
@@ -372,7 +411,12 @@ const athleteColumns: Column[] = [
 
 const gearColumns: Column[] = [
   col("id", "VARCHAR", "Gear id: b<digits> for bikes, g<digits> for shoes."),
-  expr("kind", "VARCHAR", "bike or shoe (from the id prefix).", "CASE WHEN starts_with(b->>'id', 'b') THEN 'bike' ELSE 'shoe' END"),
+  expr(
+    "kind",
+    "VARCHAR",
+    "bike or shoe (from the id prefix).",
+    "CASE WHEN starts_with(b->>'id', 'b') THEN 'bike' ELSE 'shoe' END",
+  ),
   col("name", "VARCHAR", "Display name."),
   col("nickname", "VARCHAR", "Nickname."),
   col("primary", "BOOLEAN", "Default gear for its sport."),
@@ -385,7 +429,12 @@ const gearColumns: Column[] = [
   col("description", "VARCHAR", "Description (detail only)."),
   col("weight", "DOUBLE", "Weight in kilograms (detail only)."),
   col("notification_distance", "DOUBLE", "Replacement reminder distance (detail only)."),
-  expr("detail_fetched_at", "TIMESTAMPTZ", "When /gear/{id} was fetched; null if only seen embedded.", "src.detail_fetched_at"),
+  expr(
+    "detail_fetched_at",
+    "TIMESTAMPTZ",
+    "When /gear/{id} was fetched; null if only seen embedded.",
+    "src.detail_fetched_at",
+  ),
   fetchedAt,
 ];
 
@@ -422,7 +471,12 @@ const segmentColumns: Column[] = [
   col("local_legend", "JSON", "Local Legend (detail only)."),
   col("elevation_profile", "VARCHAR", "Elevation profile image URL."),
   col("elevation_profiles", "JSON", "Elevation profile image URLs (light/dark)."),
-  expr("detail_fetched_at", "TIMESTAMPTZ", "When /segments/{id} was fetched; null if only seen embedded.", "src.detail_fetched_at"),
+  expr(
+    "detail_fetched_at",
+    "TIMESTAMPTZ",
+    "When /segments/{id} was fetched; null if only seen embedded.",
+    "src.detail_fetched_at",
+  ),
   fetchedAt,
 ];
 
@@ -497,7 +551,12 @@ export const TABLES: Table[] = [
     primaryKey: ["id"],
     columns: [...bestEffortColumns, fetchedAt],
   },
-  { name: "activity_lap", comment: "Laps of each activity, from the activity detail.", primaryKey: ["id"], columns: [...lapColumns, fetchedAt] },
+  {
+    name: "activity_lap",
+    comment: "Laps of each activity, from the activity detail.",
+    primaryKey: ["id"],
+    columns: [...lapColumns, fetchedAt],
+  },
   {
     name: "activity_split",
     comment: "Per-kilometer (metric) and per-mile (standard) splits of each activity, from the activity detail.",
@@ -522,7 +581,12 @@ export const TABLES: Table[] = [
     primaryKey: ["activity_id", "idx"],
     columns: [...kudoerColumns, fetchedAt],
   },
-  { name: "activity_comment", comment: "Comments on activities.", primaryKey: ["id"], columns: [...commentColumns, fetchedAt] },
+  {
+    name: "activity_comment",
+    comment: "Comments on activities.",
+    primaryKey: ["id"],
+    columns: [...commentColumns, fetchedAt],
+  },
   {
     name: "activity_photo",
     comment: "Photos and videos attached to activities (undocumented photos endpoint, full-size URLs).",
@@ -569,14 +633,30 @@ export const TABLES: Table[] = [
       col("elapsed_time", "DOUBLE", "Elapsed time in seconds."),
       col("elevation_gain", "DOUBLE", "Elevation gain in meters."),
       col("achievement_count", "INTEGER", "Achievements (recent only)."),
-      expr("biggest_ride_distance", "DOUBLE", "Longest ride ever in meters (same on every row of a fetch).", "src.biggest_ride_distance"),
-      expr("biggest_climb_elevation_gain", "DOUBLE", "Biggest climb ever in meters (same on every row of a fetch).", "src.biggest_climb_elevation_gain"),
+      expr(
+        "biggest_ride_distance",
+        "DOUBLE",
+        "Longest ride ever in meters (same on every row of a fetch).",
+        "src.biggest_ride_distance",
+      ),
+      expr(
+        "biggest_climb_elevation_gain",
+        "DOUBLE",
+        "Biggest climb ever in meters (same on every row of a fetch).",
+        "src.biggest_climb_elevation_gain",
+      ),
     ],
   },
-  { name: "gear", comment: "Bikes and shoes, including retired ones referenced by activities.", primaryKey: ["id"], columns: gearColumns },
+  {
+    name: "gear",
+    comment: "Bikes and shoes, including retired ones referenced by activities.",
+    primaryKey: ["id"],
+    columns: gearColumns,
+  },
   {
     name: "segment",
-    comment: "Segments seen in efforts, starred, or on routes. Detail-only columns are null until /segments/{id} is fetched.",
+    comment:
+      "Segments seen in efforts, starred, or on routes. Detail-only columns are null until /segments/{id} is fetched.",
     primaryKey: ["id"],
     columns: segmentColumns,
   },

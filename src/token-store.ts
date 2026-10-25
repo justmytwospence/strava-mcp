@@ -39,6 +39,6 @@ export function readTokenFile(path: string | undefined): StoredTokens | null {
 export function writeTokenFile(path: string, tokens: StoredTokens): void {
   mkdirSync(dirname(path), { recursive: true });
   const tmp = `${path}.tmp`;
-  writeFileSync(tmp, JSON.stringify(tokens, null, 2) + "\n", { mode: 0o600 });
+  writeFileSync(tmp, `${JSON.stringify(tokens, null, 2)}\n`, { mode: 0o600 });
   renameSync(tmp, path);
 }

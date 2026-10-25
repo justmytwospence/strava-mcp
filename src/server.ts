@@ -1,37 +1,32 @@
 import { createRequire } from "node:module";
 import { McpServer } from "@modelcontextprotocol/server";
+import { DEFAULT_TOKEN_FILE } from "./constants.js";
+import { mirror } from "./context.js";
+import { setDefaultUnits } from "./format.js";
+import { register as registerActivityAnalysis } from "./prompts/activity-analysis.js";
+import { register as registerRaceReadiness } from "./prompts/race-readiness.js";
+import { register as registerSegmentComparison } from "./prompts/segment-comparison.js";
+import { register as registerTrainingPlanReview } from "./prompts/training-plan-review.js";
+import { register as registerWeeklySummary } from "./prompts/weekly-summary.js";
+import { register as registerActivityResources } from "./resources/activities.js";
+import { register as registerAthleteResources } from "./resources/athlete.js";
+import { register as registerReferenceResources } from "./resources/reference.js";
+import { register as registerRouteResources } from "./resources/routes.js";
+import { register as registerSegmentResources } from "./resources/segments.js";
+import { hasRefreshToken } from "./strava-client.js";
 import { register as registerActivities } from "./tools/activities.js";
 import { register as registerAthletes } from "./tools/athletes.js";
 import { register as registerClubs } from "./tools/clubs.js";
 import { register as registerGear } from "./tools/gear.js";
+import { register as registerMirrorTools } from "./tools/mirror-tools.js";
 import { register as registerRoutes } from "./tools/routes.js";
 import { register as registerSegments } from "./tools/segments.js";
 import { register as registerStreams } from "./tools/streams.js";
 import { register as registerUploads } from "./tools/uploads.js";
-
-import { register as registerAthleteResources } from "./resources/athlete.js";
-import { register as registerActivityResources } from "./resources/activities.js";
-import { register as registerSegmentResources } from "./resources/segments.js";
-import { register as registerRouteResources } from "./resources/routes.js";
-import { register as registerReferenceResources } from "./resources/reference.js";
-
-import { DEFAULT_TOKEN_FILE } from "./constants.js";
-import { mirror } from "./context.js";
-import { register as registerMirrorTools } from "./tools/mirror-tools.js";
-import { setDefaultUnits } from "./format.js";
-import { hasRefreshToken } from "./strava-client.js";
 import type { DetailedAthlete } from "./types.js";
 
-import { register as registerWeeklySummary } from "./prompts/weekly-summary.js";
-import { register as registerActivityAnalysis } from "./prompts/activity-analysis.js";
-import { register as registerTrainingPlanReview } from "./prompts/training-plan-review.js";
-import { register as registerSegmentComparison } from "./prompts/segment-comparison.js";
-import { register as registerRaceReadiness } from "./prompts/race-readiness.js";
-
 export const SERVER_NAME = "strava-mcp-server";
-export const VERSION: string = createRequire(import.meta.url)(
-  "../package.json",
-).version;
+export const VERSION: string = createRequire(import.meta.url)("../package.json").version;
 
 export function validateEnv(): void {
   const required = ["STRAVA_CLIENT_ID", "STRAVA_CLIENT_SECRET"];
@@ -73,9 +68,7 @@ export function applyUnitsFromEnv(): boolean {
 export async function resolveUnitsFromProfile(): Promise<void> {
   try {
     const athlete = (await mirror().athlete()).data as DetailedAthlete;
-    setDefaultUnits(
-      athlete.measurement_preference === "feet" ? "imperial" : "metric",
-    );
+    setDefaultUnits(athlete.measurement_preference === "feet" ? "imperial" : "metric");
   } catch {
     // Keep the metric default if the profile cannot be fetched.
   }

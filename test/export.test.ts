@@ -30,7 +30,9 @@ test("the export lists starred routes and activities since a time", async () => 
   const db = await Database.open({ path: join(dir, "strava.duckdb"), snapshotDir: join(dir, "snapshot") });
   try {
     for (const f of fixtures) await db.transaction((tx) => land(tx, f.type, f.key, JSON.stringify(f.body)));
-    const starred = await db.all<{ id: string; name: string }>("SELECT id::VARCHAR AS id, name FROM route WHERE starred ORDER BY id");
+    const starred = await db.all<{ id: string; name: string }>(
+      "SELECT id::VARCHAR AS id, name FROM route WHERE starred ORDER BY id",
+    );
     const unstarred = await db.all<{ id: string }>("SELECT id::VARCHAR AS id FROM route WHERE NOT starred");
     const all = await db.all<{ id: string; start_date: string }>(
       "SELECT id::VARCHAR AS id, start_date::VARCHAR AS start_date FROM activity WHERE deleted_at IS NULL ORDER BY start_date",

@@ -10,7 +10,7 @@
 import { listValue } from "@duckdb/node-api";
 import type { Tx } from "./database.js";
 import { BODY_EXPR, bodyExpr } from "./schema.js";
-import { type Column, type Table, consumedKeys, selectList, table } from "./tables.js";
+import { type Column, consumedKeys, selectList, type Table, table } from "./tables.js";
 
 const SCOPE = "(SELECT object_key FROM _scope)";
 
@@ -110,7 +110,9 @@ function streamPoints(type: string, idColumn: string, keys: string[], bodyFor?: 
   const unnests = keys
     .map((k) => (k === "latlng" ? `unnest("latlng") AS latlng` : `unnest("${k}") AS "${k}"`))
     .join(", ");
-  const outer = keys.flatMap((k) => (k === "latlng" ? ["latlng[1] AS lat", "latlng[2] AS lng"] : [`"${k}"`])).join(", ");
+  const outer = keys
+    .flatMap((k) => (k === "latlng" ? ["latlng[1] AS lat", "latlng[2] AS lng"] : [`"${k}"`]))
+    .join(", ");
   return `(SELECT ${idColumn}, fetched_at, idx, ${outer} FROM (
       SELECT ${idColumn}, fetched_at, unnest(range(greatest(${lengths}))) AS idx, ${unnests}
       FROM (SELECT r.object_key::BIGINT AS ${idColumn}, r.fetched_at, ${lists} FROM ${source})
@@ -191,13 +193,30 @@ const activitySource = `(
 const activityRow = insert(activity, activitySource);
 
 const segmentSummary = (c: Column) =>
-  !["total_elevation_gain", "created_at", "updated_at", "polyline", "effort_count", "athlete_count", "star_count",
-    "athlete_segment_stats", "xoms", "local_legend", "detail_fetched_at", "starred_date", "pr_time", "athlete_pr_effort"].includes(c.name);
+  ![
+    "total_elevation_gain",
+    "created_at",
+    "updated_at",
+    "polyline",
+    "effort_count",
+    "athlete_count",
+    "star_count",
+    "athlete_segment_stats",
+    "xoms",
+    "local_legend",
+    "detail_fetched_at",
+    "starred_date",
+    "pr_time",
+    "athlete_pr_effort",
+  ].includes(c.name);
 
 const gearSummary = (c: Column) =>
-  ["id", "kind", "name", "nickname", "primary", "retired", "distance", "converted_distance", "fetched_at"].includes(c.name);
+  ["id", "kind", "name", "nickname", "primary", "retired", "distance", "converted_distance", "fetched_at"].includes(
+    c.name,
+  );
 
-const clubSummary = (c: Column) => !["description", "club_type", "following_count", "website", "detail_fetched_at"].includes(c.name);
+const clubSummary = (c: Column) =>
+  !["description", "club_type", "following_count", "website", "detail_fetched_at"].includes(c.name);
 
 const routeSummary = (c: Column) => !["polyline", "segments", "detail_fetched_at"].includes(c.name);
 
@@ -233,12 +252,18 @@ export const PROJECTIONS: Projection[] = [
       ),
     ],
     shapes: [
-      { objects: objects("activity_detail"), known: known(activity, "laps", "splits_metric", "splits_standard", "best_efforts", "segment_efforts") },
+      {
+        objects: objects("activity_detail"),
+        known: known(activity, "laps", "splits_metric", "splits_standard", "best_efforts", "segment_efforts"),
+      },
       { objects: objects("activity_detail", "$.laps"), known: known(lap) },
       { objects: objects("activity_detail", "$.splits_metric"), known: known(split) },
       { objects: objects("activity_detail", "$.best_efforts"), known: known(best) },
       { objects: objects("activity_detail", "$.segment_efforts"), known: known(effort) },
-      { objects: `SELECT json_extract(o, '$.segment') AS o FROM (${objects("activity_detail", "$.segment_efforts")})`, known: known(segment) },
+      {
+        objects: `SELECT json_extract(o, '$.segment') AS o FROM (${objects("activity_detail", "$.segment_efforts")})`,
+        known: known(segment),
+      },
     ],
   },
   {
@@ -258,16 +283,15 @@ export const PROJECTIONS: Projection[] = [
           WHERE m[3 * i + 1] IS NOT NULL OR m[3 * i + 3] IS NOT NULL) src`,
       ),
       `DELETE FROM activity_stream_point WHERE activity_id IN ${activityIds}`,
-      insert(
-        streamPoint,
-        streamPoints("activity_streams", "activity_id", Object.keys(STREAM_CASTS)),
-      ),
+      insert(streamPoint, streamPoints("activity_streams", "activity_id", Object.keys(STREAM_CASTS))),
     ],
     shapes: [
       { objects: objects("activity_streams"), known: new Set(Object.keys(STREAM_CASTS)) },
       {
         // Key names of each stream object, without extracting the (large) data arrays.
-        keys: `SELECT unnest(flatten(list_filter(json_keys(body, [${Object.keys(STREAM_CASTS).map((k) => `'$.${k}'`).join(", ")}]), x -> x IS NOT NULL))) AS k
+        keys: `SELECT unnest(flatten(list_filter(json_keys(body, [${Object.keys(STREAM_CASTS)
+          .map((k) => `'$.${k}'`)
+          .join(", ")}]), x -> x IS NOT NULL))) AS k
                FROM ${liveBodies("activity_streams")} WHERE body IS NOT NULL AND json_type(body) = 'OBJECT'`,
         known: known(streamMeta, "data"),
       },
@@ -291,7 +315,10 @@ export const PROJECTIONS: Projection[] = [
     ],
     shapes: [
       { objects: objects("activity_zones", "$[*]"), known: known(zone) },
-      { objects: `SELECT unnest(CAST(json_extract(o, '$.distribution_buckets') AS JSON[])) AS o FROM (${objects("activity_zones", "$[*]")})`, known: known(bucket) },
+      {
+        objects: `SELECT unnest(CAST(json_extract(o, '$.distribution_buckets') AS JSON[])) AS o FROM (${objects("activity_zones", "$[*]")})`,
+        known: known(bucket),
+      },
     ],
   },
   {
@@ -319,7 +346,12 @@ export const PROJECTIONS: Projection[] = [
       `DELETE FROM activity_photo WHERE activity_id IN ${activityIds}`,
       insert(photo, children("activity_photos", "r.body")),
     ],
-    shapes: [{ objects: objects("activity_photos", "$[*]"), known: known(photo, "activity_name", "athlete_id", "post_id", "placeholder_image", "cursor") }],
+    shapes: [
+      {
+        objects: objects("activity_photos", "$[*]"),
+        known: known(photo, "activity_name", "athlete_id", "post_id", "placeholder_image", "cursor"),
+      },
+    ],
   },
   {
     type: "athlete",
@@ -359,8 +391,14 @@ export const PROJECTIONS: Projection[] = [
     ],
     shapes: [
       { objects: objects("athlete_zones"), known: new Set(["heart_rate", "power"]) },
-      { objects: `SELECT json_extract(body, '$.heart_rate') AS o FROM ${liveBodies("athlete_zones")} WHERE body IS NOT NULL`, known: new Set(["custom_zones", "zones"]) },
-      { objects: `SELECT json_extract(body, '$.power') AS o FROM ${liveBodies("athlete_zones")} WHERE body IS NOT NULL`, known: new Set(["zones"]) },
+      {
+        objects: `SELECT json_extract(body, '$.heart_rate') AS o FROM ${liveBodies("athlete_zones")} WHERE body IS NOT NULL`,
+        known: new Set(["custom_zones", "zones"]),
+      },
+      {
+        objects: `SELECT json_extract(body, '$.power') AS o FROM ${liveBodies("athlete_zones")} WHERE body IS NOT NULL`,
+        known: new Set(["zones"]),
+      },
       { objects: objects("athlete_zones", "$.heart_rate.zones"), known: known(athleteZone) },
     ],
   },
@@ -382,21 +420,32 @@ export const PROJECTIONS: Projection[] = [
       {
         objects: objects("athlete_stats"),
         known: new Set([
-          "biggest_ride_distance", "biggest_climb_elevation_gain",
+          "biggest_ride_distance",
+          "biggest_climb_elevation_gain",
           ...["recent", "ytd", "all"].flatMap((p) => ["ride", "run", "swim"].map((s) => `${p}_${s}_totals`)),
         ]),
       },
-      { objects: `SELECT json_extract(body, '$.recent_run_totals') AS o FROM ${liveBodies("athlete_stats")} WHERE body IS NOT NULL`, known: known(athleteStats) },
+      {
+        objects: `SELECT json_extract(body, '$.recent_run_totals') AS o FROM ${liveBodies("athlete_stats")} WHERE body IS NOT NULL`,
+        known: known(athleteStats),
+      },
     ],
   },
   {
     type: "gear",
-    statements: [insert(gear, `(SELECT r.fetched_at, r.checked_at AS detail_fetched_at, r.body AS b FROM ${current("gear")}) src`)],
+    statements: [
+      insert(gear, `(SELECT r.fetched_at, r.checked_at AS detail_fetched_at, r.body AS b FROM ${current("gear")}) src`),
+    ],
     shapes: [{ objects: objects("gear"), known: known(gear) }],
   },
   {
     type: "segment",
-    statements: [insert(segment, `(SELECT r.fetched_at, r.checked_at AS detail_fetched_at, r.body AS b FROM ${current("segment")}) src`)],
+    statements: [
+      insert(
+        segment,
+        `(SELECT r.fetched_at, r.checked_at AS detail_fetched_at, r.body AS b FROM ${current("segment")}) src`,
+      ),
+    ],
     shapes: [{ objects: objects("segment"), known: known(segment) }],
   },
   {
@@ -439,7 +488,11 @@ export const PROJECTIONS: Projection[] = [
     // The route list (key 'self'): summary columns, and routes no longer listed are removed.
     type: "route_list",
     statements: [
-      upsert(route, `(SELECT r.fetched_at, NULL::TIMESTAMPTZ AS detail_fetched_at, unnest(CAST(r.body AS JSON[])) AS b FROM ${current("route_list")}) src`, routeSummary),
+      upsert(
+        route,
+        `(SELECT r.fetched_at, NULL::TIMESTAMPTZ AS detail_fetched_at, unnest(CAST(r.body AS JSON[])) AS b FROM ${current("route_list")}) src`,
+        routeSummary,
+      ),
       `DELETE FROM route WHERE id NOT IN (
           SELECT TRY_CAST(o->>'id' AS BIGINT) FROM (SELECT unnest(CAST(body AS JSON[])) AS o FROM ${liveBodies("route_list")} WHERE body IS NOT NULL))`,
     ],
@@ -447,7 +500,12 @@ export const PROJECTIONS: Projection[] = [
   },
   {
     type: "route",
-    statements: [insert(route, `(SELECT r.fetched_at, r.checked_at AS detail_fetched_at, r.body AS b FROM ${current("route")}) src`)],
+    statements: [
+      insert(
+        route,
+        `(SELECT r.fetched_at, r.checked_at AS detail_fetched_at, r.body AS b FROM ${current("route")}) src`,
+      ),
+    ],
     shapes: [{ objects: objects("route"), known: known(route) }],
   },
   {
@@ -465,16 +523,29 @@ export const PROJECTIONS: Projection[] = [
         ),
       ),
     ],
-    shapes: [{ objects: objects("route_streams", "$[*]"), known: new Set(["type", "data", "series_type", "original_size", "resolution"]) }],
+    shapes: [
+      {
+        objects: objects("route_streams", "$[*]"),
+        known: new Set(["type", "data", "series_type", "original_size", "resolution"]),
+      },
+    ],
   },
   {
     type: "club_list",
-    statements: [upsert(club, `(SELECT r.fetched_at, NULL::TIMESTAMPTZ AS detail_fetched_at, unnest(CAST(r.body AS JSON[])) AS b FROM ${current("club_list")}) src`, clubSummary)],
+    statements: [
+      upsert(
+        club,
+        `(SELECT r.fetched_at, NULL::TIMESTAMPTZ AS detail_fetched_at, unnest(CAST(r.body AS JSON[])) AS b FROM ${current("club_list")}) src`,
+        clubSummary,
+      ),
+    ],
     shapes: [{ objects: objects("club_list", "$[*]"), known: known(club) }],
   },
   {
     type: "club",
-    statements: [insert(club, `(SELECT r.fetched_at, r.checked_at AS detail_fetched_at, r.body AS b FROM ${current("club")}) src`)],
+    statements: [
+      insert(club, `(SELECT r.fetched_at, r.checked_at AS detail_fetched_at, r.body AS b FROM ${current("club")}) src`),
+    ],
     shapes: [{ objects: objects("club"), known: known(club) }],
   },
 ];
@@ -494,13 +565,14 @@ export async function project(tx: Tx, type: string, keys: string[] | null): Prom
   for (const sql of projection.statements) await tx.run(sql);
 }
 
-
 /** Keys present in landed payloads that no projection maps: schema drift to look at. */
 export async function drift(tx: Tx): Promise<Array<{ type: string; key: string; example_count: number }>> {
   const out: Array<{ type: string; key: string; example_count: number }> = [];
   for (const p of PROJECTIONS) {
     for (const shape of p.shapes) {
-      const keys = shape.keys ?? `SELECT unnest(json_keys(o)) AS k FROM (${shape.objects}) WHERE o IS NOT NULL AND json_type(o) = 'OBJECT'`;
+      const keys =
+        shape.keys ??
+        `SELECT unnest(json_keys(o)) AS k FROM (${shape.objects}) WHERE o IS NOT NULL AND json_type(o) = 'OBJECT'`;
       const rows = await tx.all<{ k: string; n: number }>(`SELECT k, count(*)::INTEGER AS n FROM (${keys}) GROUP BY k`);
       for (const r of rows) if (!shape.known.has(r.k)) out.push({ type: p.type, key: r.k, example_count: r.n });
     }

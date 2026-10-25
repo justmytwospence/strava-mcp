@@ -27,17 +27,33 @@ describe("authorize URL", () => {
 
 describe("pasted redirects", () => {
   test("accepts the full URL, the query string or a bare code", () => {
-    const full = parseRedirect("http://localhost:8765/callback?state=abc&code=0123456789abcdef0123456789abcdef&scope=read,activity:read_all");
+    const full = parseRedirect(
+      "http://localhost:8765/callback?state=abc&code=0123456789abcdef0123456789abcdef&scope=read,activity:read_all",
+    );
     assert.deepEqual(full, { code: "0123456789abcdef0123456789abcdef", state: "abc", scope: "read,activity:read_all" });
-    assert.deepEqual(parseRedirect("?code=0123456789abcdef0123456789abcdef&state=abc"), { code: "0123456789abcdef0123456789abcdef", state: "abc", scope: null });
-    assert.deepEqual(parseRedirect(" 0123456789abcdef0123456789abcdef \n"), { code: "0123456789abcdef0123456789abcdef", state: null, scope: null });
+    assert.deepEqual(parseRedirect("?code=0123456789abcdef0123456789abcdef&state=abc"), {
+      code: "0123456789abcdef0123456789abcdef",
+      state: "abc",
+      scope: null,
+    });
+    assert.deepEqual(parseRedirect(" 0123456789abcdef0123456789abcdef \n"), {
+      code: "0123456789abcdef0123456789abcdef",
+      state: null,
+      scope: null,
+    });
     assert.equal(parseRedirect("http://localhost:8765/callback?error=access_denied"), null);
     assert.equal(parseRedirect("hello"), null);
     assert.equal(parseRedirect(""), null);
   });
 
   test("reports scopes the athlete did not grant", () => {
-    assert.deepEqual(missingScopes("read,activity:read_all,activity:write,profile:read_all", "read,activity:read_all,profile:read_all"), ["activity:write"]);
+    assert.deepEqual(
+      missingScopes(
+        "read,activity:read_all,activity:write,profile:read_all",
+        "read,activity:read_all,profile:read_all",
+      ),
+      ["activity:write"],
+    );
     assert.deepEqual(missingScopes("read,activity:read_all", "read,activity:read_all,activity:write"), []);
     assert.deepEqual(missingScopes("read,activity:read_all", null), []);
   });
@@ -58,7 +74,12 @@ describe("code exchange", () => {
     }) as typeof fetch;
     const r = await exchangeCode(app, "c0de", "read,activity:read_all", http);
     assert.equal(calls[0]!.url, "https://www.strava.com/oauth/token");
-    assert.deepEqual(calls[0]!.body, { client_id: "12345", client_secret: "s3cret", code: "c0de", grant_type: "authorization_code" });
+    assert.deepEqual(calls[0]!.body, {
+      client_id: "12345",
+      client_secret: "s3cret",
+      code: "c0de",
+      grant_type: "authorization_code",
+    });
     assert.deepEqual(r, {
       access_token: "acc",
       refresh_token: "ref",
@@ -70,7 +91,8 @@ describe("code exchange", () => {
   });
 
   test("surfaces Strava's refusal", async () => {
-    const http = (async () => new Response('{"message":"Bad Request","errors":[{"code":"invalid"}]}', { status: 400 })) as typeof fetch;
+    const http = (async () =>
+      new Response('{"message":"Bad Request","errors":[{"code":"invalid"}]}', { status: 400 })) as typeof fetch;
     await assert.rejects(exchangeCode(app, "bad", null, http), /HTTP 400.*invalid/);
   });
 });
@@ -82,8 +104,20 @@ describe("token file", () => {
       const path = join(dir, "nested", "tokens.json");
       writeTokenFile(path, { access_token: "acc", refresh_token: "ref", expires_at: 1, scope: "read", athlete_id: 42 });
       assert.equal(statSync(path).mode & 0o777, 0o600);
-      assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), { access_token: "acc", refresh_token: "ref", expires_at: 1, scope: "read", athlete_id: 42 });
-      assert.deepEqual(readTokenFile(path), { access_token: "acc", refresh_token: "ref", expires_at: 1, scope: "read", athlete_id: 42 });
+      assert.deepEqual(JSON.parse(readFileSync(path, "utf8")), {
+        access_token: "acc",
+        refresh_token: "ref",
+        expires_at: 1,
+        scope: "read",
+        athlete_id: 42,
+      });
+      assert.deepEqual(readTokenFile(path), {
+        access_token: "acc",
+        refresh_token: "ref",
+        expires_at: 1,
+        scope: "read",
+        athlete_id: 42,
+      });
       assert.equal(readTokenFile(join(dir, "missing.json")), null);
       writeTokenFile(path, { access_token: "", refresh_token: "", expires_at: 0 });
       assert.equal(readTokenFile(path), null, "a file without a refresh token counts as absent");
@@ -98,7 +132,9 @@ describe("redirect listener", () => {
     const port = 18765 + Math.floor(Math.random() * 1000);
     const input = new PassThrough();
     const waiting = waitForRedirect(port, true, input);
-    const res = await fetch(`http://127.0.0.1:${port}/callback?state=s&code=0123456789abcdef0123456789abcdef&scope=read`);
+    const res = await fetch(
+      `http://127.0.0.1:${port}/callback?state=s&code=0123456789abcdef0123456789abcdef&scope=read`,
+    );
     assert.equal(res.status, 200);
     assert.match(await res.text(), /Authorized/);
     assert.deepEqual(await waiting, { code: "0123456789abcdef0123456789abcdef", state: "s", scope: "read" });

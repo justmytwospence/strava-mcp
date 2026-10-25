@@ -1,5 +1,5 @@
 import polyline from "@mapbox/polyline";
-import { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { BaseBuilder, buildGPX } from "gpx-builder";
 import { z } from "zod";
 import { mirror } from "../context.js";

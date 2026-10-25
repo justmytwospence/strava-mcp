@@ -34,7 +34,12 @@ interface Tool {
   title?: string;
   description?: string;
   inputSchema: JsonSchema;
-  annotations?: { readOnlyHint?: boolean; destructiveHint?: boolean; idempotentHint?: boolean; openWorldHint?: boolean };
+  annotations?: {
+    readOnlyHint?: boolean;
+    destructiveHint?: boolean;
+    idempotentHint?: boolean;
+    openWorldHint?: boolean;
+  };
 }
 
 interface Resource {
@@ -63,8 +68,7 @@ class StdioClient {
     this.child.stdout.setEncoding("utf8");
     this.child.stdout.on("data", (chunk: string) => {
       this.buffer += chunk;
-      let nl: number;
-      while ((nl = this.buffer.indexOf("\n")) >= 0) {
+      for (let nl = this.buffer.indexOf("\n"); nl >= 0; nl = this.buffer.indexOf("\n")) {
         const line = this.buffer.slice(0, nl).trim();
         this.buffer = this.buffer.slice(nl + 1);
         if (!line) continue;
@@ -86,12 +90,12 @@ class StdioClient {
     const id = this.next++;
     return new Promise((resolve) => {
       this.pending.set(id, resolve as (v: unknown) => void);
-      this.child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n");
+      this.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", id, method, params })}\n`);
     });
   }
 
   notify(method: string, params: Record<string, unknown> = {}): void {
-    this.child.stdin.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n");
+    this.child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", method, params })}\n`);
   }
 
   close(): void {
@@ -118,14 +122,17 @@ function groupOf(name: string): string {
 function typeOf(s: JsonSchema): string {
   if (s.enum) {
     const values = s.enum.map((v) => `\`${String(v)}\``);
-    return values.length > 12 ? `one of ${values.length} values (${values.slice(0, 6).join(", ")}, ...)` : values.join(", ");
+    return values.length > 12
+      ? `one of ${values.length} values (${values.slice(0, 6).join(", ")}, ...)`
+      : values.join(", ");
   }
   if (s.anyOf) return s.anyOf.map(typeOf).join(" or ");
-  const t = Array.isArray(s.type) ? s.type.join(" or ") : s.type ?? "any";
+  const t = Array.isArray(s.type) ? s.type.join(" or ") : (s.type ?? "any");
   if (t === "array") return `array of ${s.items ? typeOf(s.items) : "any"}`;
   if (t === "number" || t === "integer") {
     // zod's int() adds the safe-integer range, which says nothing about the parameter.
-    const meaningful = (b: number | undefined) => (b !== undefined && Math.abs(b) < Number.MAX_SAFE_INTEGER ? b : undefined);
+    const meaningful = (b: number | undefined) =>
+      b !== undefined && Math.abs(b) < Number.MAX_SAFE_INTEGER ? b : undefined;
     const min = meaningful(s.minimum);
     const max = meaningful(s.maximum);
     const bounds = [min !== undefined ? `min ${min}` : "", max !== undefined ? `max ${max}` : ""].filter(Boolean);
@@ -157,7 +164,9 @@ function renderTool(t: Tool): string {
     lines.push("| Parameter | Type | Required | Description |", "|---|---|---|---|");
     for (const [name, schema] of Object.entries(props)) {
       const def = schema.default !== undefined ? ` Default \`${JSON.stringify(schema.default)}\`.` : "";
-      lines.push(`| \`${name}\` | ${cell(typeOf(schema))} | ${required.has(name) ? "yes" : "no"} | ${cell(schema.description)}${def} |`);
+      lines.push(
+        `| \`${name}\` | ${cell(typeOf(schema))} | ${required.has(name) ? "yes" : "no"} | ${cell(schema.description)}${def} |`,
+      );
     }
     lines.push("");
   }
@@ -206,17 +215,34 @@ async function main(): Promise<void> {
       md.push(`## ${group}`, "");
       for (const t of list) md.push(renderTool(t));
     }
-    md.push("## Resources", "", "Read-only context a client can pull into a conversation.", "", "| URI | Description |", "|---|---|");
+    md.push(
+      "## Resources",
+      "",
+      "Read-only context a client can pull into a conversation.",
+      "",
+      "| URI | Description |",
+      "|---|---|",
+    );
     for (const r of resources) md.push(`| \`${r.uri}\` | ${cell(r.description)} |`);
     for (const r of resourceTemplates) md.push(`| \`${r.uriTemplate}\` | ${cell(r.description)} |`);
-    md.push("", "## Prompts", "", "Prompt templates that gather data from the mirror and ask the model for an analysis.", "", "| Prompt | Arguments | Description |", "|---|---|---|");
+    md.push(
+      "",
+      "## Prompts",
+      "",
+      "Prompt templates that gather data from the mirror and ask the model for an analysis.",
+      "",
+      "| Prompt | Arguments | Description |",
+      "|---|---|---|",
+    );
     for (const p of prompts) {
       const args = (p.arguments ?? []).map((a) => `\`${a.name}\`${a.required ? "" : "?"}`).join(", ") || "none";
       md.push(`| \`${p.name}\` | ${args} | ${cell(p.description)} |`);
     }
     md.push("");
     writeFileSync(out, md.join("\n"));
-    console.log(`wrote ${out}: ${tools.length} tools, ${resources.length + resourceTemplates.length} resources, ${prompts.length} prompts`);
+    console.log(
+      `wrote ${out}: ${tools.length} tools, ${resources.length + resourceTemplates.length} resources, ${prompts.length} prompts`,
+    );
   } finally {
     client.close();
     rmSync(dir, { recursive: true, force: true });

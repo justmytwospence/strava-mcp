@@ -59,7 +59,9 @@ export class SnapshotPublisher {
 
   private async due(): Promise<boolean> {
     if (!this.dirty) return false;
-    const backlog = await this.db.one<{ n: number }>("SELECT count(*)::INTEGER AS n FROM sync_job WHERE priority >= 20");
+    const backlog = await this.db.one<{ n: number }>(
+      "SELECT count(*)::INTEGER AS n FROM sync_job WHERE priority >= 20",
+    );
     const interval = (backlog?.n ?? 0) > 0 ? this.intervals.backfilling : this.intervals.idle;
     return Date.now() - this.lastPublished >= interval;
   }

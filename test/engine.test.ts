@@ -8,7 +8,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, test } from "node:test";
 import { Database } from "../src/db/database.js";
-import { DEFAULT_ROUTES_INTERVAL_MINUTES, MIN_ROUTES_INTERVAL_MINUTES, routesInterval, SyncEngine } from "../src/sync/engine.js";
+import {
+  DEFAULT_ROUTES_INTERVAL_MINUTES,
+  MIN_ROUTES_INTERVAL_MINUTES,
+  routesInterval,
+  SyncEngine,
+} from "../src/sync/engine.js";
 import { MINUTE } from "../src/time.js";
 
 let dir: string;

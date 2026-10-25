@@ -9,7 +9,7 @@
  * must commit in steps is a resumable function instead (see Migration).
  */
 import type { Tx } from "./database.js";
-import { TABLES, commentSql, createTableSql, tableDdl } from "./tables.js";
+import { commentSql, createTableSql, TABLES, tableDdl } from "./tables.js";
 
 export type MigrationStep = string | ((tx: Tx) => Promise<void>);
 
@@ -157,7 +157,10 @@ const RAW_CURRENT_DDL: string[] = [
 const PROGRESS_KEY = "migration:2:next_row";
 
 async function tableExists(tx: Tx, name: string): Promise<boolean> {
-  return !!(await tx.one("SELECT 1 FROM duckdb_tables() WHERE database_name = current_database() AND schema_name = 'main' AND table_name = $1", [name]));
+  return !!(await tx.one(
+    "SELECT 1 FROM duckdb_tables() WHERE database_name = current_database() AND schema_name = 'main' AND table_name = $1",
+    [name],
+  ));
 }
 
 /**
@@ -188,7 +191,8 @@ async function moveLargePayloads(tx: Tx): Promise<void> {
   const progress = await tx.one<{ value: string }>("SELECT value FROM sync_state WHERE name = $1", [PROGRESS_KEY]);
   const STEP = 2048;
   let from = progress ? Number(progress.value) : 0;
-  if (total > 0 && from <= last) console.error(`mirror: moving large payloads of ${total} stored responses into raw_blob (one-time migration)`);
+  if (total > 0 && from <= last)
+    console.error(`mirror: moving large payloads of ${total} stored responses into raw_blob (one-time migration)`);
   for (; from <= last; from += STEP) {
     const where = `rowid >= ${from} AND rowid < ${from + STEP}`;
     await tx.run("BEGIN TRANSACTION");
@@ -201,7 +205,10 @@ async function moveLargePayloads(tx: Tx): Promise<void> {
     await tx.run(`INSERT INTO raw_payload_v2
       SELECT object_type, object_key, content_hash, fetched_at, CASE WHEN strlen(body::VARCHAR) > ${BLOB_CHUNK_BYTES} THEN NULL ELSE body END
       FROM raw_payload WHERE ${where}`);
-    await tx.run("INSERT OR REPLACE INTO sync_state (name, value, updated_at) VALUES ($1, $2, now())", [PROGRESS_KEY, String(from + STEP)]);
+    await tx.run("INSERT OR REPLACE INTO sync_state (name, value, updated_at) VALUES ($1, $2, now())", [
+      PROGRESS_KEY,
+      String(from + STEP),
+    ]);
     await tx.run("COMMIT");
   }
 

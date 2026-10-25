@@ -1,20 +1,13 @@
-import { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
-import {
-  formatDate,
-  formatDistance,
-  formatDuration,
-  formatElevation,
-  formatWeight,
-} from "../format.js";
-import type {
-  DetailedAthlete,
-  AthleteStats,
-  SummaryActivity,
-} from "../types.js";
+import { formatDate, formatDistance, formatDuration, formatElevation, formatWeight } from "../format.js";
+import type { AthleteStats, DetailedAthlete, SummaryActivity } from "../types.js";
 
-function formatActivityTotal(label: string, t: { count: number; distance: number; moving_time: number; elevation_gain: number }): string {
+function formatActivityTotal(
+  label: string,
+  t: { count: number; distance: number; moving_time: number; elevation_gain: number },
+): string {
   if (t.count === 0) return `${label}: no activities`;
   return `${label}: ${t.count} activities | ${formatDistance(t.distance)} | ${formatDuration(t.moving_time)} | ${formatElevation(t.elevation_gain)} gain`;
 }
@@ -24,15 +17,12 @@ export function register(server: McpServer): void {
     "race-readiness",
     {
       title: "Race Readiness Assessment",
-      description:
-        "Assess fitness and race readiness based on recent training history and athlete stats.",
+      description: "Assess fitness and race readiness based on recent training history and athlete stats.",
       argsSchema: z.object({
         distance: z
           .string()
           .optional()
-          .describe(
-            "Target race distance (e.g. '5k', '10k', 'half marathon', 'marathon')",
-          ),
+          .describe("Target race distance (e.g. '5k', '10k', 'half marathon', 'marathon')"),
       }),
     },
     async ({ distance }) => {
@@ -68,10 +58,7 @@ export function register(server: McpServer): void {
         recentText = "No activities in the last 90 days.";
       } else {
         const runs = activities.filter(
-          (a) =>
-            a.sport_type === "Run" ||
-            a.sport_type === "TrailRun" ||
-            a.sport_type === "VirtualRun",
+          (a) => a.sport_type === "Run" || a.sport_type === "TrailRun" || a.sport_type === "VirtualRun",
         );
         const rides = activities.filter(
           (a) =>
@@ -89,10 +76,12 @@ export function register(server: McpServer): void {
           return `${label}: ${acts.length} activities | ${formatDistance(totalDist)} total | ${formatDuration(totalTime)} | longest: ${formatDistance(longest)}`;
         };
 
-        const recent = activities.slice(0, 10).map(
-          (a) =>
-            `  - ${formatDate(a.start_date_local)}: ${a.name} (${a.sport_type}) | ${formatDistance(a.distance)} | ${formatDuration(a.moving_time)}`,
-        );
+        const recent = activities
+          .slice(0, 10)
+          .map(
+            (a) =>
+              `  - ${formatDate(a.start_date_local)}: ${a.name} (${a.sport_type}) | ${formatDistance(a.distance)} | ${formatDuration(a.moving_time)}`,
+          );
 
         recentText = [
           `Last 90 days (${activities.length} total activities):`,

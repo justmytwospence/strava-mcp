@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/server";
+import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { ACTIVITY_STREAM_KEYS, SEGMENT_STREAM_KEYS } from "../constants.js";
 import { mirror } from "../context.js";
@@ -19,8 +19,8 @@ function coerceArray<T extends z.ZodTypeAny>(schema: T) {
   }, schema);
 }
 
-const maxPoints = z
-  .coerce.number()
+const maxPoints = z.coerce
+  .number()
   .int()
   .min(10)
   .max(2000)
@@ -113,7 +113,9 @@ export function register(server: McpServer): void {
       description: "Get GPS coordinates, distance, and altitude data for a segment.",
       inputSchema: z.object({
         segment_id: z.coerce.number().int().describe("The segment ID"),
-        keys: coerceArray(z.array(z.enum(SEGMENT_STREAM_KEYS)).min(1)).describe("Stream types: latlng, distance, altitude"),
+        keys: coerceArray(z.array(z.enum(SEGMENT_STREAM_KEYS)).min(1)).describe(
+          "Stream types: latlng, distance, altitude",
+        ),
         max_points: maxPoints,
       }),
       annotations: READ_ONLY,
