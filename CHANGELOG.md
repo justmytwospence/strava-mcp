@@ -20,7 +20,7 @@ All notable changes to this project are documented here. The format follows [Kee
 
 - The route list is refreshed hourly instead of daily, so starring or unstarring a route (which Strava sends no webhook for) reaches the snapshot within about two hours.
 
-## [4.0.0] - Unreleased
+## [4.0.0] - 2026-10-24
 
 A release for strangers: a self-contained Compose stack, a documentation site, an authorization command, and a raw store that keeps memory bounded on real accounts.
 
@@ -83,7 +83,10 @@ A release for strangers: a self-contained Compose stack, a documentation site, a
 
 - Initial server over the Strava API: activities, athletes, segments, routes with GPX and TCX export, streams, clubs, gear, uploads; resources and prompts.
 
-[4.0.0]: https://github.com/justmytwospence/strava-mcp/compare/v3.1.1...HEAD
+[Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.2.0...HEAD
+[4.2.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.1.0...v4.2.0
+[4.1.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.0.0...v4.1.0
+[4.0.0]: https://github.com/justmytwospence/strava-mcp/compare/v3.1.1...v4.0.0
 [3.1.1]: https://github.com/justmytwospence/strava-mcp/compare/v3.1.0...v3.1.1
 [3.1.0]: https://github.com/justmytwospence/strava-mcp/compare/v3.0.3...v3.1.0
 [3.0.3]: https://github.com/justmytwospence/strava-mcp/compare/v3.0.2...v3.0.3
