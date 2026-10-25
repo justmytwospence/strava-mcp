@@ -26,6 +26,25 @@ import type { Priority } from "./rate-limit.js";
 /** The activity-list poll interval while a webhook subscription is active. */
 const PUSH_LIST_RECENT_EVERY = 6 * HOUR;
 
+/**
+ * How often the route list is refreshed. Strava sends no webhook for starring or
+ * unstarring a route, so polling is the only way to notice; each poll costs one or two
+ * reads. The default is an hour; STRAVA_ROUTES_INTERVAL_MINUTES lowers it (to no less
+ * than five minutes) when something consumes the starred flag promptly, such as
+ * garmin-mcp's course cleanup through /export/sync.
+ */
+export const DEFAULT_ROUTES_INTERVAL_MINUTES = 60;
+export const MIN_ROUTES_INTERVAL_MINUTES = 5;
+
+export function routesInterval(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.STRAVA_ROUTES_INTERVAL_MINUTES;
+  const minutes = raw === undefined || raw === "" ? DEFAULT_ROUTES_INTERVAL_MINUTES : Number(raw);
+  if (!Number.isFinite(minutes)) {
+    throw new Error(`STRAVA_ROUTES_INTERVAL_MINUTES must be a number of minutes, got "${raw}"`);
+  }
+  return Math.max(MIN_ROUTES_INTERVAL_MINUTES, minutes) * MINUTE;
+}
+
 export function priorityClass(priority: number): Priority {
   if (priority < 10) return "interactive";
   if (priority < 20) return "incremental";
@@ -49,9 +68,8 @@ const PERIODIC: Array<{ kind: string; every: number; priority: number }> = [
   { kind: "athlete_zones", every: DAY, priority: 15 },
   { kind: "list_window", every: DAY, priority: 15 },
   { kind: "starred_segments", every: DAY, priority: 15 },
-  // Every 15 minutes (one or two requests): Strava sends no webhook for starring or unstarring a route,
-  // and consumers of the snapshot (garmin-mcp's course cleanup) act on the starred flag.
-  { kind: "routes", every: 15 * MINUTE, priority: 15 },
+  // See routesInterval(): the interval is read from the environment at schedule time.
+  { kind: "routes", every: DEFAULT_ROUTES_INTERVAL_MINUTES * MINUTE, priority: 15 },
   { kind: "clubs", every: DAY, priority: 15 },
   { kind: "list_full", every: 7 * DAY, priority: 25 },
 ];
@@ -114,10 +132,13 @@ export interface EngineOptions {
   onChange?: () => void;
   /** Ceiling on how long the worker waits for the rate limiter before re-picking a job. */
   pollMs?: number;
+  /** Route list refresh interval; defaults to STRAVA_ROUTES_INTERVAL_MINUTES or an hour. */
+  routesIntervalMs?: number;
 }
 
 export class SyncEngine {
   readonly fetch: Fetchers;
+  private readonly routesEvery: number;
   private running = false;
   private wake: (() => void) | null = null;
   private current: Job | null = null;
@@ -131,6 +152,7 @@ export class SyncEngine {
     private readonly options: EngineOptions = {},
   ) {
     this.fetch = new Fetchers(db);
+    this.routesEvery = options.routesIntervalMs ?? routesInterval();
   }
 
   /** Whether Strava pushes activity events to us, which makes frequent polling unnecessary. */
@@ -171,7 +193,9 @@ export class SyncEngine {
     const hasActivities = await this.db.one<{ n: number }>("SELECT count(*)::INTEGER AS n FROM activity");
     for (const task of PERIODIC) {
       const last = state.get(`last:${task.kind}`);
-      const every = task.kind === "list_recent" && this.pushActive ? PUSH_LIST_RECENT_EVERY : task.every;
+      let every = task.every;
+      if (task.kind === "list_recent" && this.pushActive) every = PUSH_LIST_RECENT_EVERY;
+      if (task.kind === "routes") every = this.routesEvery;
       if (last && Date.now() - Date.parse(last) < every) continue;
       // The first full listing is the start of the backfill, so it runs at incremental priority.
       const priority = task.kind === "list_full" && !hasActivities?.n ? 10 : task.priority;
