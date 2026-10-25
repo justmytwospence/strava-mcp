@@ -43,11 +43,12 @@ const unitsFromEnv = applyUnitsFromEnv();
 
 // ------------------------------------------------------------------ the mirror
 
-const dbPath = process.env.STRAVA_DB_PATH ?? DEFAULT_DB_PATH;
+// Empty variables count as unset: an env_file passes `VAR=` lines through as empty strings.
+const dbPath = process.env.STRAVA_DB_PATH || DEFAULT_DB_PATH;
 const db = await Database.open({
   path: dbPath,
-  snapshotDir: process.env.STRAVA_SNAPSHOT_DIR ?? join(dirname(dbPath), "snapshot"),
-  memoryLimit: process.env.DUCKDB_MEMORY_LIMIT,
+  snapshotDir: process.env.STRAVA_SNAPSHOT_DIR || join(dirname(dbPath), "snapshot"),
+  memoryLimit: process.env.DUCKDB_MEMORY_LIMIT || undefined,
   threads: process.env.DUCKDB_THREADS ? Number(process.env.DUCKDB_THREADS) : undefined,
 });
 
@@ -100,7 +101,7 @@ const webhook = webhookUrl
   : null;
 if (webhook) engine.pushStatus = () => webhook.status();
 
-const syncEnabled = (process.env.STRAVA_SYNC ?? "on").toLowerCase() !== "off";
+const syncEnabled = (process.env.STRAVA_SYNC || "on").toLowerCase() !== "off";
 if (syncEnabled) {
   engine.start();
   snapshot.start();
@@ -115,7 +116,7 @@ async function closeMirror(): Promise<void> {
 
 // ------------------------------------------------------------------ transports
 
-const transport = (process.env.MCP_TRANSPORT ?? "stdio").toLowerCase();
+const transport = (process.env.MCP_TRANSPORT || "stdio").toLowerCase();
 const status = `mirror: ${dbPath}, sync ${syncEnabled ? "on" : "off"}`;
 
 if (transport === "stdio") {
@@ -128,7 +129,7 @@ if (transport === "stdio") {
   process.on("SIGTERM", shutdown);
   process.on("SIGINT", shutdown);
 } else if (transport === "http") {
-  const port = Number(process.env.PORT ?? 8000);
+  const port = Number(process.env.PORT || 8000);
   const handler = createMcpHandler(createServer);
   const app = createHttpApp({
     handler,

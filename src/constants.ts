@@ -1,6 +1,6 @@
 // Strava's changelog (https://developers.strava.com/docs/changelog/, June 1, 2026) announces
 // https://api-v3.strava.com as the new base URL, available from January 4, 2027; override to switch early.
-export const STRAVA_API_BASE = process.env.STRAVA_API_BASE ?? "https://www.strava.com/api/v3";
+export const STRAVA_API_BASE = process.env.STRAVA_API_BASE || "https://www.strava.com/api/v3";
 export const STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token";
 
 /**

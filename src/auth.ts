@@ -164,7 +164,7 @@ export function parseArgs(argv: string[], env: NodeJS.ProcessEnv = process.env):
     clientId: env.STRAVA_CLIENT_ID ?? "",
     clientSecret: env.STRAVA_CLIENT_SECRET ?? "",
     tokenFile: env.STRAVA_TOKEN_FILE || DEFAULT_TOKEN_FILE,
-    port: Number(env.STRAVA_AUTH_PORT ?? DEFAULT_PORT),
+    port: Number(env.STRAVA_AUTH_PORT || DEFAULT_PORT),
     scopes: DEFAULT_SCOPES,
     noListen: false,
   };
