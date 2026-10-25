@@ -16,7 +16,7 @@ import { DAY, HOUR, MINUTE, SECOND } from "./time.js";
 
 const FOREVER = Number.POSITIVE_INFINITY;
 /** How long a tool waits for the rate limiter before falling back to a stale copy. */
-const INTERACTIVE_WAIT_MS = 20 * SECOND;
+export const INTERACTIVE_WAIT_MS = 20 * SECOND;
 
 export interface Provenance {
   source: "mirror" | "strava";
@@ -288,7 +288,17 @@ export class Mirror {
     return this.cached("club", id, DAY, () => this.f.club(id, this.opts));
   }
 
-  // ---------------------------------------------------------------- writes
+  // ---------------------------------------------------------------- pass-through
+
+  /**
+   * A read that is not mirrored (upload status, which is transient): straight to
+   * Strava at interactive priority, with the same wait cap as every other tool, so a
+   * spent daily limit answers with an error instead of hanging until midnight.
+   */
+  async read(path: string, params?: Record<string, unknown>): Promise<unknown> {
+    const { text, contentType } = await requestRaw("GET", path, { params, ...this.opts });
+    return contentType.includes("application/json") ? safeJsonParse(text) : text;
+  }
 
   /**
    * Send a write to Strava and land what it returns (as `landAs`), so the mirror
@@ -300,7 +310,7 @@ export class Mirror {
     body: Record<string, unknown> | FormData,
     landAs?: { type: string; key?: (parsed: Record<string, unknown>) => string },
   ): Promise<unknown> {
-    const { text, contentType } = await requestRaw(method, path, { body, priority: "interactive", maxWaitMs: INTERACTIVE_WAIT_MS });
+    const { text, contentType } = await requestRaw(method, path, { body, ...this.opts });
     const parsed = contentType.includes("application/json") ? (safeJsonParse(text) as Record<string, unknown>) : text;
     if (landAs && typeof parsed === "object" && parsed !== null) {
       const key = landAs.key ? landAs.key(parsed) : String(parsed.id);

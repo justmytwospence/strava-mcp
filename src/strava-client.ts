@@ -211,33 +211,3 @@ export async function requestRaw(
   }
   return { status: res.status, text, contentType: res.headers.get("content-type") ?? "" };
 }
-
-async function request<T>(method: string, path: string, options: RequestOptions = {}): Promise<T> {
-  const { text, contentType } = await requestRaw(method, path, options);
-  if (contentType.includes("application/json")) {
-    return safeJsonParse(text) as T;
-  }
-  return text as unknown as T;
-}
-
-export function stravaGet<T>(
-  path: string,
-  params?: Record<string, unknown>,
-  options: Omit<RequestOptions, "params" | "body"> = {},
-): Promise<T> {
-  return request<T>("GET", path, { ...options, params });
-}
-
-export function stravaPost<T>(
-  path: string,
-  body?: Record<string, unknown> | FormData,
-): Promise<T> {
-  return request<T>("POST", path, { body });
-}
-
-export function stravaPut<T>(
-  path: string,
-  body?: Record<string, unknown>,
-): Promise<T> {
-  return request<T>("PUT", path, { body });
-}

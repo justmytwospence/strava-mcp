@@ -1,10 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { stravaGet, stravaPost } from "../strava-client.js";
 import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
 import { jsonResult } from "../format.js";
-import type { Upload } from "../types.js";
 
 const DATA_TYPES = ["fit", "fit.gz", "tcx", "tcx.gz", "gpx", "gpx.gz"] as const;
 
@@ -27,7 +25,8 @@ export function register(server: McpServer): void {
     },
     async ({ upload_id }: { upload_id: number }) => {
       try {
-        const upload = await stravaGet<Upload>(`/uploads/${upload_id}`);
+        // Upload status is transient, so it is read through, never mirrored.
+        const upload = await mirror().read(`/uploads/${upload_id}`);
         return jsonResult(upload);
       } catch (error) {
         return formatToolError(error);
@@ -100,9 +99,10 @@ export function register(server: McpServer): void {
         if (commute !== undefined) formData.append("commute", String(commute));
         if (external_id) formData.append("external_id", external_id);
 
-        const upload = await stravaPost<Upload>("/uploads", formData as unknown as FormData);
+        const m = mirror();
+        const upload = await m.write("POST", "/uploads", formData);
         // The new activity appears in the next listing; ask for one soon.
-        await mirror().engine.enqueue("list_recent", "self", 5);
+        await m.engine.enqueue("list_recent", "self", 5);
         return jsonResult(upload);
       } catch (error) {
         return formatToolError(error);
