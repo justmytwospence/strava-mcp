@@ -2,9 +2,10 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
 import {
+  formatDate,
   formatDistance,
   formatDuration,
-  formatDate,
+  formatElevation,
 } from "../format.js";
 import type { SummaryActivity } from "../types.js";
 
@@ -21,7 +22,7 @@ function formatActivity(a: SummaryActivity): string {
   const parts = [
     `- ${a.name} (${a.sport_type})`,
     `  ${formatDate(a.start_date_local)}`,
-    `  ${formatDistance(a.distance)} | ${formatDuration(a.moving_time)} | ${Math.round(a.total_elevation_gain)}m gain`,
+    `  ${formatDistance(a.distance)} | ${formatDuration(a.moving_time)} | ${formatElevation(a.total_elevation_gain)} gain`,
   ];
   if (a.average_heartrate) parts.push(`  Avg HR: ${a.average_heartrate} bpm`);
   if (a.average_watts) parts.push(`  Avg Power: ${a.average_watts}W`);

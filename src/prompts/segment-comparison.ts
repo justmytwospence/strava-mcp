@@ -2,9 +2,10 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
 import {
+  formatDate,
   formatDistance,
   formatDuration,
-  formatDate,
+  formatElevation,
 } from "../format.js";
 import type { DetailedSegment, SegmentEffort } from "../types.js";
 
@@ -30,7 +31,7 @@ export function register(server: McpServer): void {
         `Segment: ${segment.name}`,
         `Distance: ${formatDistance(segment.distance)}`,
         `Avg Grade: ${segment.average_grade}% | Max Grade: ${segment.maximum_grade}%`,
-        `Elevation: ${Math.round(segment.elevation_low)}m - ${Math.round(segment.elevation_high)}m (+${Math.round(segment.total_elevation_gain)}m)`,
+        `Elevation: ${formatElevation(segment.elevation_low)} - ${formatElevation(segment.elevation_high)} (${formatElevation(segment.total_elevation_gain, undefined, true)})`,
         `Total efforts: ${segment.effort_count} | Athletes: ${segment.athlete_count}`,
       ].join("\n");
 

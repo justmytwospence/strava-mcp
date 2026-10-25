@@ -2,9 +2,11 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
 import {
+  formatDate,
   formatDistance,
   formatDuration,
-  formatDate,
+  formatElevation,
+  formatWeight,
 } from "../format.js";
 import type {
   DetailedAthlete,
@@ -14,7 +16,7 @@ import type {
 
 function formatActivityTotal(label: string, t: { count: number; distance: number; moving_time: number; elevation_gain: number }): string {
   if (t.count === 0) return `${label}: no activities`;
-  return `${label}: ${t.count} activities | ${formatDistance(t.distance)} | ${formatDuration(t.moving_time)} | ${Math.round(t.elevation_gain)}m gain`;
+  return `${label}: ${t.count} activities | ${formatDistance(t.distance)} | ${formatDuration(t.moving_time)} | ${formatElevation(t.elevation_gain)} gain`;
 }
 
 export function register(server: McpServer): void {
@@ -43,7 +45,7 @@ export function register(server: McpServer): void {
 
       const profile = [
         `Athlete: ${athlete.firstname} ${athlete.lastname}`,
-        athlete.weight ? `Weight: ${athlete.weight}kg` : null,
+        athlete.weight ? `Weight: ${formatWeight(athlete.weight)}` : null,
         athlete.ftp ? `FTP: ${athlete.ftp}W` : null,
       ]
         .filter(Boolean)

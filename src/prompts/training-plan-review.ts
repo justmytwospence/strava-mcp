@@ -2,9 +2,10 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
 import {
+  formatDate,
   formatDistance,
   formatDuration,
-  formatDate,
+  formatElevation,
 } from "../format.js";
 import type { SummaryActivity } from "../types.js";
 
@@ -53,7 +54,7 @@ export function register(server: McpServer): void {
         const totalDist = acts.reduce((s, a) => s + a.distance, 0);
         const totalTime = acts.reduce((s, a) => s + a.moving_time, 0);
         const totalElev = acts.reduce((s, a) => s + a.total_elevation_gain, 0);
-        const header = `${type}: ${acts.length} activities | ${formatDistance(totalDist)} | ${formatDuration(totalTime)} | ${Math.round(totalElev)}m gain`;
+        const header = `${type}: ${acts.length} activities | ${formatDistance(totalDist)} | ${formatDuration(totalTime)} | ${formatElevation(totalElev)} gain`;
         const list = acts
           .map(
             (a) =>

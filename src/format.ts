@@ -20,6 +20,7 @@ export type Units = "metric" | "imperial";
 
 const METERS_PER_MILE = 1609.344;
 const METERS_PER_FOOT = 0.3048;
+const KILOGRAMS_PER_POUND = 0.45359237;
 
 let defaultUnits: Units = "metric";
 
@@ -75,14 +76,25 @@ export function formatPace(
   return `${min}:${sec.toString().padStart(2, "0")} ${label}`;
 }
 
+/** An elevation or elevation gain; pass `signed` to keep a leading + for differences. */
 export function formatElevation(
   meters: number,
   units: Units = defaultUnits,
+  signed = false,
+): string {
+  const value = units === "imperial" ? Math.round(meters / METERS_PER_FOOT) : Math.round(meters);
+  const sign = signed && value > 0 ? "+" : "";
+  return `${sign}${value} ${units === "imperial" ? "ft" : "m"}`;
+}
+
+export function formatWeight(
+  kilograms: number,
+  units: Units = defaultUnits,
 ): string {
   if (units === "imperial") {
-    return `${Math.round(meters / METERS_PER_FOOT)} ft`;
+    return `${Math.round(kilograms / KILOGRAMS_PER_POUND)} lb`;
   }
-  return `${Math.round(meters)} m`;
+  return `${Math.round(kilograms * 10) / 10} kg`;
 }
 
 export function formatDate(isoString: string): string {

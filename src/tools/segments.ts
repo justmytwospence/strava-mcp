@@ -4,7 +4,7 @@ import polyline from "@mapbox/polyline";
 import { buildGPX, BaseBuilder } from "gpx-builder";
 import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
-import { jsonResult, mirrorResult, textResult, formatDistance } from "../format.js";
+import { formatDistance, formatElevation, jsonResult, mirrorResult, textResult } from "../format.js";
 import type { DetailedSegment } from "../types.js";
 
 const { Point, Segment, Track } = BaseBuilder.MODELS;
@@ -184,7 +184,7 @@ export function register(server: McpServer): void {
 
         const desc = [
           formatDistance(segment.distance),
-          `${Math.round(segment.total_elevation_gain)}m gain`,
+          `${formatElevation(segment.total_elevation_gain)} gain`,
           `${segment.average_grade}% avg grade`,
         ].join(" | ");
 

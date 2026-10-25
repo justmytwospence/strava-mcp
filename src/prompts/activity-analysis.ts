@@ -2,17 +2,19 @@ import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
 import {
+  formatDate,
   formatDistance,
   formatDuration,
+  formatElevation,
   formatPace,
-  formatDate,
+  getDefaultUnits,
 } from "../format.js";
 import type { DetailedActivity, Stream } from "../types.js";
 
 function formatSplit(s: { split: number; distance: number; moving_time: number; average_speed: number; elevation_difference: number; average_heartrate?: number }): string {
   const parts = [
     `  Split ${s.split}: ${formatDistance(s.distance)} in ${formatDuration(s.moving_time)}`,
-    `    Pace: ${formatPace(s.average_speed)} | Elev: ${s.elevation_difference > 0 ? "+" : ""}${Math.round(s.elevation_difference)}m`,
+    `    Pace: ${formatPace(s.average_speed)} | Elev: ${formatElevation(s.elevation_difference, undefined, true)}`,
   ];
   if (s.average_heartrate) parts.push(`    Avg HR: ${s.average_heartrate} bpm`);
   return parts.join("\n");
@@ -61,7 +63,7 @@ export function register(server: McpServer): void {
         `Date: ${formatDate(activity.start_date_local)}`,
         `Distance: ${formatDistance(activity.distance)}`,
         `Duration: ${formatDuration(activity.moving_time)} moving / ${formatDuration(activity.elapsed_time)} elapsed`,
-        `Elevation: +${Math.round(activity.total_elevation_gain)}m`,
+        `Elevation: ${formatElevation(activity.total_elevation_gain, undefined, true)}`,
         `Calories: ${activity.calories}`,
       ];
       if (activity.average_heartrate) header.push(`Avg HR: ${activity.average_heartrate} bpm | Max HR: ${activity.max_heartrate} bpm`);
@@ -70,8 +72,11 @@ export function register(server: McpServer): void {
       if (activity.device_name) header.push(`Device: ${activity.device_name}`);
       if (activity.gear) header.push(`Gear: ${activity.gear.name}`);
 
-      const splits = activity.splits_metric?.length
-        ? "\nKilometer splits:\n" + activity.splits_metric.map(formatSplit).join("\n")
+      // Strava provides both split series; show the one in the athlete's units.
+      const imperial = getDefaultUnits() === "imperial";
+      const splitList = (imperial ? activity.splits_standard : activity.splits_metric) ?? [];
+      const splits = splitList.length
+        ? `\n${imperial ? "Mile" : "Kilometer"} splits:\n` + splitList.map(formatSplit).join("\n")
         : "";
 
       const efforts = activity.segment_efforts?.length
