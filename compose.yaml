@@ -62,7 +62,7 @@ services:
       # authentication guide). Find it as jwks_uri in <issuer>/.well-known/openid-configuration.
       OIDC_JWKS_URL: "${OIDC_JWKS_URL:-}"
       OIDC_CLIENT_ID: "${OIDC_CLIENT_ID:-}"
-      OIDC_AUDIENCE: "${OIDC_AUDIENCE:-${OIDC_CLIENT_ID}}"
+      OIDC_AUDIENCE: "${OIDC_AUDIENCE:-${OIDC_CLIENT_ID:-}}"
       PUBLIC_URL: "${PUBLIC_URL:-}"
       MCP_UPSTREAM: "http://strava-mcp:8000/mcp"
       MCP_BUFFER: ${MCP_BUFFER:-33554432}
