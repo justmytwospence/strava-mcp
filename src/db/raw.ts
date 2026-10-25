@@ -107,15 +107,6 @@ export async function markNotFound(tx: Tx, type: string, key: string, at = new D
   await project(tx, type, [key]);
 }
 
-/** Record a check that found the payload unchanged without re-sending it (e.g. via a list). */
-export async function touch(tx: Tx, type: string, key: string, at = new Date()): Promise<void> {
-  await tx.run("UPDATE raw_latest SET checked_at = $3::TIMESTAMPTZ WHERE object_type = $1 AND object_key = $2", [
-    type,
-    key,
-    at.toISOString(),
-  ]);
-}
-
 export interface CurrentPayload {
   status: string;
   checked_at: string;

@@ -154,12 +154,6 @@ export class Database {
     return this.instance.connect();
   }
 
-  /** The catalog name of the mirror (the file's basename), for COPY FROM DATABASE. */
-  async catalog(): Promise<string> {
-    const row = await this.one<{ db: string }>("SELECT current_database() AS db");
-    return row!.db;
-  }
-
   close(): void {
     this.writer.closeSync();
     this.instance.closeSync();

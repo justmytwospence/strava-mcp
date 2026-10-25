@@ -187,7 +187,7 @@ export class Fetchers {
         const gone = await tx.all<{ k: string }>(
           `SELECT object_key AS k FROM raw_latest
            WHERE object_type = 'activity_summary' AND status = 'ok' AND object_key NOT IN (SELECT unnest($1::VARCHAR[]))`,
-          [listOf(seen)],
+          [listValue(seen)],
         );
         for (const g of gone) await markNotFound(tx, "activity_summary", g.k);
         return gone.map((g) => g.k);
@@ -293,8 +293,4 @@ export class Fetchers {
   club(id: string, opts: FetchOptions) {
     return this.one("club", id, `/clubs/${id}`, undefined, opts);
   }
-}
-
-function listOf(values: string[]) {
-  return listValue(values);
 }

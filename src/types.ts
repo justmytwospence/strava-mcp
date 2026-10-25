@@ -114,13 +114,6 @@ export interface Lap {
   total_elevation_gain: number;
 }
 
-export interface Comment {
-  id: number;
-  text: string;
-  athlete: SummaryAthlete;
-  created_at: string;
-}
-
 export interface SummaryClub {
   id: number;
   name: string;
@@ -133,12 +126,6 @@ export interface SummaryClub {
   member_count: number;
   private: boolean;
   url: string;
-}
-
-export interface DetailedClub extends SummaryClub {
-  description: string;
-  club_type: string;
-  following_count: number;
 }
 
 export interface SummarySegment {
@@ -185,21 +172,6 @@ export interface SegmentEffort {
   achievements: Array<{ type_id: number; type: string; rank: number }>;
 }
 
-export interface Route {
-  id: number;
-  name: string;
-  description: string;
-  distance: number;
-  elevation_gain: number;
-  type: number;
-  sub_type: number;
-  private: boolean;
-  starred: boolean;
-  timestamp: number;
-  map: ActivityMap;
-  estimated_moving_time: number;
-}
-
 export interface SummaryGear {
   id: string;
   name: string;
@@ -217,34 +189,6 @@ export interface Stream {
   series_type: string;
   original_size: number;
   resolution: string;
-}
-
-export interface Upload {
-  id: number;
-  id_str: string;
-  external_id: string;
-  error: string | null;
-  status: string;
-  activity_id: number | null;
-}
-
-export interface ActivityZone {
-  score: number;
-  distribution_buckets: Array<{ min: number; max: number; time: number }>;
-  type: string;
-  sensor_based: boolean;
-  points: number;
-  custom_zones: boolean;
-}
-
-export interface AthleteZones {
-  heart_rate: {
-    custom_zones: boolean;
-    zones: Array<{ min: number; max: number }>;
-  };
-  power?: {
-    zones: Array<{ min: number; max: number }>;
-  };
 }
 
 export interface AthleteStats {
@@ -268,17 +212,4 @@ export interface ActivityTotal {
   elapsed_time: number;
   elevation_gain: number;
   achievement_count?: number;
-}
-
-export interface ExplorerSegment {
-  id: number;
-  name: string;
-  climb_category: number;
-  climb_category_desc: string;
-  avg_grade: number;
-  elev_difference: number;
-  distance: number;
-  points: string;
-  start_latlng: [number, number];
-  end_latlng: [number, number];
 }

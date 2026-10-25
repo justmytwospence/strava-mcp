@@ -58,8 +58,6 @@ export const SPORT_TYPES = [
   "Yoga",
 ] as const;
 
-export type SportType = (typeof SPORT_TYPES)[number];
-
 export const ACTIVITY_STREAM_KEYS = [
   "time",
   "distance",
