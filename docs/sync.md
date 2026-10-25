@@ -4,7 +4,7 @@ The sync engine is a durable job queue inside the mirror, one worker that drains
 
 ## Rate limits
 
-Strava enforces two pairs of limits, overall and non-upload reads, each with a 15-minute and a daily window (100 / 1,000 by default; 200 / 2,000 after the free upgrade in the API settings). The 15-minute windows reset at :00, :15, :30 and :45 UTC, the daily one at midnight UTC. Usage is read from the `X-RateLimit-*` and `X-ReadRateLimit-*` headers of every response, carried forward, and reset at window boundaries; it survives restarts through the `rate_sample` table.
+Strava enforces two pairs of limits, overall and non-upload reads, each with a 15-minute and a daily window: by default 200 / 2,000 overall and 100 / 1,000 for reads, and 400 / 4,000 and 200 / 2,000 after the self-service upgrade in the API settings ([Strava's rate limits page](https://developers.strava.com/docs/rate-limits/)). The 15-minute windows reset at :00, :15, :30 and :45 UTC, the daily one at midnight UTC. Usage is read from the `X-RateLimit-*` and `X-ReadRateLimit-*` headers of every response, carried forward, and reset at window boundaries; it survives restarts through the `rate_sample` table.
 
 Each priority class may use only part of a window, so background work can never starve a person:
 
@@ -28,9 +28,11 @@ Lower runs first; within a priority, newer activities first.
 | 20 | Backfill: activity details and streams, newest first |
 | 21 | Backfill: zones |
 | 25 | Gear and route details, the weekly full listing |
+| 26 | Route geometry |
 | 30 | Kudos, comments, photos |
 | 35 | Club details |
-| 40 | Segment details and geometry |
+| 40 | Segment details |
+| 41 | Segment geometry |
 
 Priorities below 10 use the interactive class, below 20 incremental, the rest backfill.
 
@@ -42,7 +44,7 @@ Priorities below 10 use the interactive class, below 20 incremental, the rest ba
 | `list_window` | day | Relists the last 90 days to find edits |
 | `list_full` | week | Lists everything; activities missing from it are marked deleted |
 | `athlete`, `athlete_stats` | 6 h | Profile and totals (the totals keep a history) |
-| `routes` | 15 min | Routes and their starred flag (Strava sends no webhook for starring a route) |
+| `routes` | hour (`STRAVA_ROUTES_INTERVAL_MINUTES`, minimum 5) | Routes and their starred flag (Strava sends no webhook for starring a route); lower it when something consumes the starred flag promptly, such as [garmin-mcp's course cleanup](integrations/garmin-mcp.md) |
 | `athlete_zones`, `starred_segments`, `clubs` | day | |
 
 After every listing the planner compares the mirror with what it should hold and queues the differences: a detail that was never fetched or whose summary changed since, streams and zones that are missing, social payloads whose count on the activity disagrees with what is stored, gear older than a week, routes updated since their last fetch, segments seen in efforts but never fetched. Planning twice adds nothing.
@@ -61,11 +63,12 @@ Every read tool goes through the same rule: serve the stored copy if it is young
 | Kudos, comments, photos | until the count on the activity disagrees, hourly for a week |
 | Athlete profile | 6 hours; zones a day; stats an hour |
 | Gear, clubs | a day; segments a week |
-| Routes | until the route list reports an update |
+| Route list, starred segments | an hour |
+| Route detail, geometry and GPX/TCX export | a day, and at once when the route list reports the route updated since it was fetched |
 
 Each result ends with a line such as `[served from the local mirror (fetched from Strava 2026-10-20T08:12:00Z)]`, `[fetched from Strava just now]`, or `[served from the local mirror ...] [stale: Strava could not be asked: ...]`, so the model and the reader know what they are looking at.
 
-Writes (`strava_update_activity`, `strava_create_activity`, `strava_star_segment`, uploads) go to Strava first; the response is stored like any other payload, and a listing is queued so the mirror catches up with anything derived from it.
+Writes (`strava_update_activity`, `strava_create_activity`, `strava_star_segment`) go to Strava first; the response is stored like any other payload, and a listing is queued so the mirror catches up with anything derived from it. Uploads (`strava_create_upload`, `strava_get_upload`) pass through to Strava without being stored, since an upload's status is transient; the activity an upload creates arrives through the listing that is queued right after it. All of them use the same interactive priority and 20-second wait cap as the reads.
 
 ## Webhook
 

@@ -77,7 +77,7 @@ FROM athlete_stats WHERE period = 'all' ORDER BY fetched_at, sport;
 
 ## The snapshot
 
-DuckDB allows one writing process, so nothing else can open the live file. The server publishes a consistent read-only copy to `snapshot/strava.duckdb` next to it: a byte copy taken under the write lock after a checkpoint, hourly when the mirror changed (every six hours during a backfill), atomically replacing the previous one. Readers open it read-only, and several can at once.
+DuckDB allows one writing process, so nothing else can open the live file. The server publishes a consistent read-only copy to `snapshot/strava.duckdb` next to it: a byte copy taken under the write lock after a checkpoint, atomically replacing the previous one. The first copy is published at startup (nearly empty on a fresh install), then at most hourly while the sync is idle and every six hours during a backfill, whenever the mirror changed. Readers open it read-only, and several can at once.
 
 With `SNAPSHOT_TOKEN` set it is also served at `GET /snapshot.duckdb` with range requests, so DuckDB's `httpfs` can attach it over HTTP from anywhere:
 

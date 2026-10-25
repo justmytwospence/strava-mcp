@@ -32,7 +32,7 @@ def _(duckdb, mo, os):
     mo.stop(
         not os.path.exists(snapshot_path),
         mo.callout(
-            mo.md(f"No snapshot at `{snapshot_path}` yet. The server publishes one within an hour of the first sync (every six hours during a backfill)."),
+            mo.md(f"No snapshot at `{snapshot_path}` yet. The server publishes one at startup on a fresh install, then hourly while idle and every six hours during a backfill, whenever the mirror changed."),
             kind="warn",
         ),
     )

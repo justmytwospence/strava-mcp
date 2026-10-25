@@ -9,10 +9,12 @@
  *   15  periodic: profile, zones, stats, routes, clubs, starred segments
  *   20  backfill core: activity details and streams, newest first
  *   21  backfill zones
- *   25  gear details, route details
+ *   25  gear details, route details, the weekly full listing
+ *   26  route geometry
  *   30  social: kudos, comments, photos
  *   35  club details
- *   40  segment details and geometry
+ *   40  segment details
+ *   41  segment geometry
  * Priorities below 10 use the interactive rate class, below 20 incremental, the rest
  * backfill.
  */
