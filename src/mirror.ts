@@ -18,9 +18,12 @@ const FOREVER = Number.POSITIVE_INFINITY;
 /** How long a tool waits for the rate limiter before falling back to a stale copy. */
 export const INTERACTIVE_WAIT_MS = 20 * SECOND;
 
+/** Where an answer came from; appended to tool results by format.ts's mirrorResult. */
 export interface Provenance {
   source: "mirror" | "strava";
+  /** When Strava was last asked, or null when the answer was assembled from stored rows. */
   fetched_at: string | null;
+  /** Set when the stored copy was served because Strava could not be asked. */
   stale?: string;
 }
 

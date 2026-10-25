@@ -1,4 +1,5 @@
 import { CHARACTER_LIMIT } from "./constants.js";
+import type { Provenance } from "./mirror.js";
 
 export function textResult(text: string): {
   content: Array<{ type: "text"; text: string }>;
@@ -116,20 +117,14 @@ export function formatDate(isoString: string): string {
 }
 
 /** Where an answer came from, appended to tool results as a second text block. */
-export interface ProvenanceNote {
-  source: "mirror" | "strava";
-  fetched_at: string | null;
-  stale?: string;
-}
-
-export function provenanceText(meta: ProvenanceNote): string {
+export function provenanceText(meta: Provenance): string {
   const when = meta.fetched_at ? ` (fetched from Strava ${meta.fetched_at})` : "";
   const origin = meta.source === "mirror" ? `[served from the local mirror${when}]` : "[fetched from Strava just now]";
   return meta.stale ? `${origin} [stale: Strava could not be asked: ${meta.stale}]` : origin;
 }
 
 /** jsonResult plus a provenance line. */
-export function mirrorResult(data: unknown, meta: ProvenanceNote): {
+export function mirrorResult(data: unknown, meta: Provenance): {
   content: Array<{ type: "text"; text: string }>;
 } {
   const result = jsonResult(data);

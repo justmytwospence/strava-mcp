@@ -1,9 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import { ACTIVITY_STREAM_KEYS, SEGMENT_STREAM_KEYS } from "../constants.js";
 import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
 import { mirrorResult } from "../format.js";
-import { ACTIVITY_STREAM_KEYS, SEGMENT_STREAM_KEYS } from "../constants.js";
+import { READ_ONLY } from "./annotations.js";
 
 function coerceArray<T extends z.ZodTypeAny>(schema: T) {
   return z.preprocess((val) => {
@@ -17,6 +18,14 @@ function coerceArray<T extends z.ZodTypeAny>(schema: T) {
     return val;
   }, schema);
 }
+
+const maxPoints = z
+  .coerce.number()
+  .int()
+  .min(10)
+  .max(2000)
+  .default(500)
+  .describe("Maximum data points to return (10-2000, default 500). Streams are downsampled if larger.");
 
 type StreamSet = Record<string, { data: unknown[]; original_size?: number; resolution?: string; series_type?: string }>;
 
@@ -58,36 +67,14 @@ export function register(server: McpServer): void {
         "Get high-resolution time-series data for an activity (heart rate, power, cadence, altitude, GPS coordinates, etc.). Data is downsampled if too large.",
       inputSchema: z.object({
         activity_id: z.coerce.number().int().describe("The activity ID"),
-        keys: coerceArray(z
-          .array(z.enum(ACTIVITY_STREAM_KEYS))
-          .min(1))
-          .describe(
-            "Stream types to retrieve: time, distance, latlng, altitude, velocity_smooth, heartrate, cadence, watts, temp, moving, grade_smooth",
-          ),
-        max_points: z
-          .coerce.number()
-          .int()
-          .min(10)
-          .max(2000)
-          .default(500)
-          .describe("Maximum data points to return (10-2000, default 500). Streams are downsampled if larger."),
+        keys: coerceArray(z.array(z.enum(ACTIVITY_STREAM_KEYS)).min(1)).describe(
+          "Stream types to retrieve: time, distance, latlng, altitude, velocity_smooth, heartrate, cadence, watts, temp, moving, grade_smooth",
+        ),
+        max_points: maxPoints,
       }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
-    async ({
-      activity_id,
-      keys,
-      max_points,
-    }: {
-      activity_id: number;
-      keys: string[];
-      max_points: number;
-    }) => {
+    async ({ activity_id, keys, max_points }) => {
       try {
         const { data, meta } = await mirror().activityStreams(String(activity_id));
         return mirrorResult(selectStreams(data, keys, max_points), meta);
@@ -101,38 +88,15 @@ export function register(server: McpServer): void {
     "strava_get_segment_effort_streams",
     {
       title: "Get Segment Effort Streams",
-      description:
-        "Get high-resolution time-series data for a segment effort.",
+      description: "Get high-resolution time-series data for a segment effort.",
       inputSchema: z.object({
         effort_id: z.string().describe("The segment effort ID"),
-        keys: coerceArray(z
-          .array(z.enum(ACTIVITY_STREAM_KEYS))
-          .min(1))
-          .describe("Stream types to retrieve"),
-        max_points: z
-          .coerce.number()
-          .int()
-          .min(10)
-          .max(2000)
-          .default(500)
-          .describe("Maximum data points (10-2000, default 500)"),
+        keys: coerceArray(z.array(z.enum(ACTIVITY_STREAM_KEYS)).min(1)).describe("Stream types to retrieve"),
+        max_points: maxPoints,
       }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
-    async ({
-      effort_id,
-      keys,
-      max_points,
-    }: {
-      effort_id: string;
-      keys: string[];
-      max_points: number;
-    }) => {
+    async ({ effort_id, keys, max_points }) => {
       try {
         const { data, meta } = await mirror().segmentEffortStreams(effort_id);
         return mirrorResult(selectStreams(data, keys, max_points), meta);
@@ -146,38 +110,15 @@ export function register(server: McpServer): void {
     "strava_get_segment_streams",
     {
       title: "Get Segment Streams",
-      description:
-        "Get GPS coordinates, distance, and altitude data for a segment.",
+      description: "Get GPS coordinates, distance, and altitude data for a segment.",
       inputSchema: z.object({
         segment_id: z.coerce.number().int().describe("The segment ID"),
-        keys: coerceArray(z
-          .array(z.enum(SEGMENT_STREAM_KEYS))
-          .min(1))
-          .describe("Stream types: latlng, distance, altitude"),
-        max_points: z
-          .coerce.number()
-          .int()
-          .min(10)
-          .max(2000)
-          .default(500)
-          .describe("Maximum data points (10-2000, default 500)"),
+        keys: coerceArray(z.array(z.enum(SEGMENT_STREAM_KEYS)).min(1)).describe("Stream types: latlng, distance, altitude"),
+        max_points: maxPoints,
       }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
-    async ({
-      segment_id,
-      keys,
-      max_points,
-    }: {
-      segment_id: number;
-      keys: string[];
-      max_points: number;
-    }) => {
+    async ({ segment_id, keys, max_points }) => {
       try {
         const { data, meta } = await mirror().segmentStreams(String(segment_id));
         return mirrorResult(selectStreams(data, keys, max_points), meta);
@@ -191,32 +132,14 @@ export function register(server: McpServer): void {
     "strava_get_route_streams",
     {
       title: "Get Route Streams",
-      description:
-        "Get GPS coordinates, distance, and altitude data for a route.",
+      description: "Get GPS coordinates, distance, and altitude data for a route.",
       inputSchema: z.object({
         route_id: z.string().describe("The route ID"),
-        max_points: z
-          .coerce.number()
-          .int()
-          .min(10)
-          .max(2000)
-          .default(500)
-          .describe("Maximum data points (10-2000, default 500)"),
+        max_points: maxPoints,
       }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
-    async ({
-      route_id,
-      max_points,
-    }: {
-      route_id: string;
-      max_points: number;
-    }) => {
+    async ({ route_id, max_points }) => {
       try {
         const { data, meta } = await mirror().routeStreams(route_id);
         return mirrorResult(selectStreams(data, null, max_points), meta);

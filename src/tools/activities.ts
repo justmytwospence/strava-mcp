@@ -1,11 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import { SPORT_TYPES } from "../constants.js";
 import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
 import { jsonResult, mirrorResult, pageOf } from "../format.js";
-import { paginationSchema, formatPaginationNote } from "../pagination.js";
-import { SPORT_TYPES } from "../constants.js";
-import type { DetailedActivity } from "../types.js";
+import { formatPaginationNote, paginationSchema } from "../pagination.js";
+import { CREATE, READ_ONLY, UPDATE } from "./annotations.js";
 
 export function register(server: McpServer): void {
   server.registerTool(
@@ -15,36 +15,13 @@ export function register(server: McpServer): void {
       description:
         "List the authenticated athlete's activities, newest first. Supports filtering by date range and pagination. Served from the local mirror (refreshed from Strava at most every 15 minutes).",
       inputSchema: z.object({
-        before: z
-          .coerce.number()
-          .int()
-          .optional()
-          .describe("Only activities before this epoch timestamp (seconds)"),
-        after: z
-          .coerce.number()
-          .int()
-          .optional()
-          .describe("Only activities after this epoch timestamp (seconds)"),
+        before: z.coerce.number().int().optional().describe("Only activities before this epoch timestamp (seconds)"),
+        after: z.coerce.number().int().optional().describe("Only activities after this epoch timestamp (seconds)"),
         ...paginationSchema,
       }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
-    async ({
-      before,
-      after,
-      page,
-      per_page,
-    }: {
-      before?: number;
-      after?: number;
-      page: number;
-      per_page: number;
-    }) => {
+    async ({ before, after, page, per_page }) => {
       try {
         const { data: activities, meta } = await mirror().listActivities({ before, after, page, perPage: per_page });
         const note = formatPaginationNote(activities.length, page, per_page);
@@ -68,14 +45,9 @@ export function register(server: McpServer): void {
           .optional()
           .describe("Ignored: the mirror stores every segment effort and always returns them all. Kept for compatibility."),
       }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
-    async ({ activity_id }: { activity_id: number; include_all_efforts?: boolean }) => {
+    async ({ activity_id }) => {
       try {
         const { data, meta } = await mirror().activity(String(activity_id));
         return mirrorResult(data, meta);
@@ -89,54 +61,25 @@ export function register(server: McpServer): void {
     "strava_create_activity",
     {
       title: "Create Activity",
-      description:
-        "Create a manual activity entry. Requires activity:write scope.",
+      description: "Create a manual activity entry. Requires activity:write scope.",
       inputSchema: z.object({
         name: z.string().describe("The name of the activity"),
         sport_type: z.enum(SPORT_TYPES).describe("The sport type (e.g. Run, Ride, Swim, Hike)"),
         start_date_local: z
           .string()
           .describe("ISO 8601 date/time for activity start in local timezone (e.g. 2024-01-15T08:30:00Z)"),
-        elapsed_time: z
-          .coerce.number()
-          .int()
-          .min(1)
-          .describe("Total elapsed time in seconds"),
+        elapsed_time: z.coerce.number().int().min(1).describe("Total elapsed time in seconds"),
         description: z.string().optional().describe("Activity description"),
-        distance: z
-          .coerce.number()
-          .min(0)
-          .optional()
-          .describe("Distance in meters"),
-        trainer: z
-          .boolean()
-          .optional()
-          .describe("Whether this was a trainer/indoor activity"),
-        commute: z
-          .boolean()
-          .optional()
-          .describe("Whether this was a commute"),
+        distance: z.coerce.number().min(0).optional().describe("Distance in meters"),
+        trainer: z.boolean().optional().describe("Whether this was a trainer/indoor activity"),
+        commute: z.boolean().optional().describe("Whether this was a commute"),
       }),
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: false,
-        openWorldHint: true,
-      },
+      annotations: CREATE,
     },
-    async (params: {
-      name: string;
-      sport_type: string;
-      start_date_local: string;
-      elapsed_time: number;
-      description?: string;
-      distance?: number;
-      trainer?: boolean;
-      commute?: boolean;
-    }) => {
+    async (params) => {
       try {
         const m = mirror();
-        const activity = (await m.write("POST", "/activities", params, { type: "activity_detail" })) as DetailedActivity;
+        const activity = await m.write("POST", "/activities", params, { type: "activity_detail" });
         await m.engine.enqueue("list_recent", "self", 5);
         return jsonResult(activity);
       } catch (error) {
@@ -156,37 +99,14 @@ export function register(server: McpServer): void {
         name: z.string().optional().describe("New name"),
         sport_type: z.enum(SPORT_TYPES).optional().describe("New sport type"),
         description: z.string().optional().describe("New description"),
-        gear_id: z
-          .string()
-          .optional()
-          .describe('Gear ID to associate (e.g. "b12345"), or "none" to remove'),
+        gear_id: z.string().optional().describe('Gear ID to associate (e.g. "b12345"), or "none" to remove'),
         trainer: z.boolean().optional().describe("Whether this is a trainer activity"),
         commute: z.boolean().optional().describe("Whether this is a commute"),
-        hide_from_home: z
-          .boolean()
-          .optional()
-          .describe("Whether to mute this activity in the feed"),
+        hide_from_home: z.boolean().optional().describe("Whether to mute this activity in the feed"),
       }),
-      annotations: {
-        readOnlyHint: false,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: UPDATE,
     },
-    async ({
-      activity_id,
-      ...updates
-    }: {
-      activity_id: number;
-      name?: string;
-      sport_type?: string;
-      description?: string;
-      gear_id?: string;
-      trainer?: boolean;
-      commute?: boolean;
-      hide_from_home?: boolean;
-    }) => {
+    async ({ activity_id, ...updates }) => {
       try {
         const m = mirror();
         const activity = await m.write("PUT", `/activities/${activity_id}`, updates, { type: "activity_detail" });
@@ -208,22 +128,9 @@ export function register(server: McpServer): void {
         activity_id: z.coerce.number().int().describe("The activity ID"),
         ...paginationSchema,
       }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
-    async ({
-      activity_id,
-      page,
-      per_page,
-    }: {
-      activity_id: number;
-      page: number;
-      per_page: number;
-    }) => {
+    async ({ activity_id, page, per_page }) => {
       try {
         const { data, meta } = await mirror().activityComments(String(activity_id));
         const comments = pageOf(data as unknown[], page, per_page);
@@ -244,22 +151,9 @@ export function register(server: McpServer): void {
         activity_id: z.coerce.number().int().describe("The activity ID"),
         ...paginationSchema,
       }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
-    async ({
-      activity_id,
-      page,
-      per_page,
-    }: {
-      activity_id: number;
-      page: number;
-      per_page: number;
-    }) => {
+    async ({ activity_id, page, per_page }) => {
       try {
         const { data, meta } = await mirror().activityKudos(String(activity_id));
         const kudoers = pageOf(data as unknown[], page, per_page);
@@ -280,14 +174,9 @@ export function register(server: McpServer): void {
       inputSchema: z.object({
         activity_id: z.coerce.number().int().describe("The activity ID"),
       }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
-    async ({ activity_id }: { activity_id: number }) => {
+    async ({ activity_id }) => {
       try {
         // Laps are part of the activity detail, so this costs no separate request.
         const { data, meta } = await mirror().activity(String(activity_id));
@@ -302,19 +191,13 @@ export function register(server: McpServer): void {
     "strava_list_activity_zones",
     {
       title: "List Activity Zones",
-      description:
-        "Get heart rate and power zone distribution for an activity. Shows time spent in each zone.",
+      description: "Get heart rate and power zone distribution for an activity. Shows time spent in each zone.",
       inputSchema: z.object({
         activity_id: z.coerce.number().int().describe("The activity ID"),
       }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
-    async ({ activity_id }: { activity_id: number }) => {
+    async ({ activity_id }) => {
       try {
         const { data, meta } = await mirror().activityZones(String(activity_id));
         return mirrorResult(data, meta);

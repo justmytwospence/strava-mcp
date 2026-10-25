@@ -1,11 +1,12 @@
-import { McpServer } from "@modelcontextprotocol/server";
 import { type DuckDBConnection, StatementType } from "@duckdb/node-api";
+import { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
 import { exitOnFatalDatabaseError } from "../db/fatal.js";
 import { drift } from "../db/projections.js";
 import { formatToolError } from "../errors.js";
 import { jsonResult, textResult } from "../format.js";
+import { LOCAL_READ_ONLY } from "./annotations.js";
 
 const QUERY_TIMEOUT_MS = 30_000;
 let readConnection: Promise<DuckDBConnection> | null = null;
@@ -58,9 +59,9 @@ export function register(server: McpServer): void {
         sql: z.string().describe("One DuckDB SELECT statement (DESCRIBE, SUMMARIZE and EXPLAIN also work)."),
         max_rows: z.coerce.number().int().min(1).max(5000).default(200).describe("Maximum rows to return (default 200)."),
       }),
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: LOCAL_READ_ONLY,
     },
-    async ({ sql, max_rows }: { sql: string; max_rows: number }) => {
+    async ({ sql, max_rows }) => {
       try {
         const result = await runReadOnly(sql, max_rows);
         return jsonResult({
@@ -84,9 +85,9 @@ export function register(server: McpServer): void {
       inputSchema: z.object({
         table: z.string().optional().describe("A table or view name; omit to list them all."),
       }),
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: LOCAL_READ_ONLY,
     },
-    async ({ table }: { table?: string }) => {
+    async ({ table }) => {
       try {
         const db = mirror().db;
         if (!table) {
@@ -124,7 +125,7 @@ export function register(server: McpServer): void {
       description:
         "How complete and fresh the local mirror is: activity coverage (details, streams, zones), the sync queue by kind, last run of each periodic task, recent errors, rate-limit usage, and any fields Strava returns that the schema does not yet map.",
       inputSchema: z.object({}),
-      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+      annotations: LOCAL_READ_ONLY,
     },
     async () => {
       try {

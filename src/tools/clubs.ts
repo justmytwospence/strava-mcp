@@ -3,26 +3,21 @@ import { z } from "zod";
 import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
 import { mirrorResult, pageOf } from "../format.js";
-import { paginationSchema, formatPaginationNote } from "../pagination.js";
+import { formatPaginationNote, paginationSchema } from "../pagination.js";
+import { READ_ONLY } from "./annotations.js";
 
 export function register(server: McpServer): void {
   server.registerTool(
     "strava_list_athlete_clubs",
     {
       title: "List Athlete Clubs",
-      description:
-        "List clubs the authenticated athlete belongs to.",
+      description: "List clubs the authenticated athlete belongs to.",
       inputSchema: z.object({
         ...paginationSchema,
       }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
-    async ({ page, per_page }: { page: number; per_page: number }) => {
+    async ({ page, per_page }) => {
       try {
         const { data, meta } = await mirror().clubs();
         const clubs = pageOf(data as unknown[], page, per_page);
@@ -38,19 +33,13 @@ export function register(server: McpServer): void {
     "strava_get_club",
     {
       title: "Get Club",
-      description:
-        "Get detailed information about a club including description, member count, and sport type.",
+      description: "Get detailed information about a club including description, member count, and sport type.",
       inputSchema: z.object({
         club_id: z.coerce.number().int().describe("The club ID"),
       }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
-    async ({ club_id }: { club_id: number }) => {
+    async ({ club_id }) => {
       try {
         const { data, meta } = await mirror().club(String(club_id));
         return mirrorResult(data, meta);
@@ -59,5 +48,4 @@ export function register(server: McpServer): void {
       }
     },
   );
-
 }

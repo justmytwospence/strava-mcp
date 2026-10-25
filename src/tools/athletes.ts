@@ -3,7 +3,8 @@ import { z } from "zod";
 import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
 import { mirrorResult, pageOf } from "../format.js";
-import { paginationSchema, formatPaginationNote } from "../pagination.js";
+import { formatPaginationNote, paginationSchema } from "../pagination.js";
+import { READ_ONLY } from "./annotations.js";
 
 export function register(server: McpServer): void {
   server.registerTool(
@@ -13,12 +14,7 @@ export function register(server: McpServer): void {
       description:
         "Get the profile of the currently authenticated athlete, including name, location, stats summary, bikes, and shoes.",
       inputSchema: z.object({}),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
     async () => {
       try {
@@ -34,15 +30,9 @@ export function register(server: McpServer): void {
     "strava_get_athlete_zones",
     {
       title: "Get Athlete Zones",
-      description:
-        "Get the authenticated athlete's heart rate and power zones.",
+      description: "Get the authenticated athlete's heart rate and power zones.",
       inputSchema: z.object({}),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
     async () => {
       try {
@@ -59,7 +49,7 @@ export function register(server: McpServer): void {
     {
       title: "Get Athlete Stats",
       description:
-        "Get activity statistics for an athlete: recent, year-to-date, and all-time totals for runs, rides, and swims. Includes biggest ride distance and biggest climb.",
+        "Get activity statistics for the authenticated athlete: recent, year-to-date, and all-time totals for runs, rides, and swims. Includes biggest ride distance and biggest climb.",
       inputSchema: z.object({
         athlete_id: z
           .coerce.number()
@@ -67,14 +57,9 @@ export function register(server: McpServer): void {
           .optional()
           .describe("Ignored: Strava serves stats only for the authenticated athlete, which the mirror holds. Kept for compatibility."),
       }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
-    async (_args: { athlete_id?: number }) => {
+    async () => {
       try {
         const { data, meta } = await mirror().athleteStats();
         return mirrorResult(data, meta);
@@ -88,19 +73,13 @@ export function register(server: McpServer): void {
     "strava_list_starred_segments",
     {
       title: "List Starred Segments",
-      description:
-        "List segments starred by the authenticated athlete.",
+      description: "List segments starred by the authenticated athlete.",
       inputSchema: z.object({
         ...paginationSchema,
       }),
-      annotations: {
-        readOnlyHint: true,
-        destructiveHint: false,
-        idempotentHint: true,
-        openWorldHint: true,
-      },
+      annotations: READ_ONLY,
     },
-    async ({ page, per_page }: { page: number; per_page: number }) => {
+    async ({ page, per_page }) => {
       try {
         const { data, meta } = await mirror().starredSegments();
         const segments = pageOf(data as unknown[], page, per_page);
