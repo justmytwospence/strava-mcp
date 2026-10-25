@@ -1,55 +1,64 @@
 /**
- * GET /export/garmin-sync: the few facts garmin-mcp's Strava sync needs, read live
- * from the mirror, so it does not have to wait for the hourly snapshot. Starred routes
- * (with their start point) and the names of activities that started since a given
- * time; a few kilobytes, no Strava request. Served to the snapshot's bearer token.
+ * GET /export/sync (alias /export/garmin-sync): a small JSON payload for other
+ * services that act on what this mirror knows. Read live from the mirror, so a
+ * consumer does not have to wait for the next snapshot: the starred routes (with
+ * their start point) and the activities that started since a given time. A few
+ * kilobytes, no Strava request. Served to the snapshot's bearer token.
+ *
+ * garmin-mcp's optional Strava sync is the first consumer: it renames Garmin
+ * activities after their Strava names and deletes the courses Strava made for
+ * routes that are no longer starred. The contract is documented in
+ * docs/reference/export.md; changing a field here is a breaking change there.
  */
+import polyline from "@mapbox/polyline";
 import type { Database } from "./db/database.js";
 
 export interface ExportRoute {
-  /** Route id as a string: route ids exceed 2^53. */
+  /** Route id as a string: route ids exceed 2^53 and would lose precision as a JSON number. */
   id: string;
   name: string;
+  /** Meters, or null when Strava reported none. */
   distance: number | null;
-  /** First point of the summary polyline, [lat, lng]. */
+  /** First point of the summary polyline, [lat, lng], or null without a polyline. */
   start: [number, number] | null;
 }
 
 export interface ExportActivity {
+  /** Activity id as a string, for the same reason as routes. */
   id: string;
   name: string;
+  /** Start in UTC, ISO 8601. */
   start_date: string;
+  /** Seconds, or null when unknown. */
   elapsed_time: number | null;
 }
 
-export interface GarminSyncExport {
+export interface SyncExport {
+  /** When this payload was computed. */
   generated_at: string;
   /** When the route list (and so the starred flags) was last fetched from Strava. */
   route_list_checked_at: string | null;
   /** When the recent activity list was last fetched (webhook events update names in between). */
   activity_list_checked_at: string | null;
   starred_routes: ExportRoute[];
+  /** Activities not deleted on Strava that started at or after `since`; empty without `since`. */
   activities: ExportActivity[];
 }
 
-/** The first [lat, lng] of a Google-encoded polyline, decoding only two values. */
+/**
+ * The first [lat, lng] of a Google-encoded polyline, or null when there is none or
+ * the string does not decode to a point on Earth (a corrupt or placeholder value).
+ */
 export function polylineStart(encoded: string | null | undefined): [number, number] | null {
   if (!encoded) return null;
-  const values: number[] = [];
-  let i = 0;
-  while (values.length < 2) {
-    let result = 0;
-    let shift = 0;
-    let b: number;
-    do {
-      if (i >= encoded.length) return null;
-      b = encoded.charCodeAt(i++) - 63;
-      result |= (b & 0x1f) << shift;
-      shift += 5;
-    } while (b >= 0x20);
-    values.push(result & 1 ? ~(result >> 1) : result >> 1);
+  let first: [number, number] | undefined;
+  try {
+    first = polyline.decode(encoded)[0];
+  } catch {
+    return null;
   }
-  return [values[0]! / 1e5, values[1]! / 1e5];
+  if (!first || Math.abs(first[0]) > 90 || Math.abs(first[1]) > 180) return null;
+  return [first[0], first[1]];
 }
 
 const iso = (v: unknown): string | null => {
@@ -58,7 +67,7 @@ const iso = (v: unknown): string | null => {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 };
 
-export async function garminSyncExport(db: Database, since: Date | null): Promise<GarminSyncExport> {
+export async function syncExport(db: Database, since: Date | null): Promise<SyncExport> {
   const checked = await db.one<{ t: string | null }>(
     "SELECT checked_at::VARCHAR AS t FROM raw_latest WHERE object_type = 'route_list' AND object_key = 'self'",
   );

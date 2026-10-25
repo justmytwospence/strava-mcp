@@ -1,5 +1,5 @@
 /**
- * GET /export/garmin-sync's payload: starred routes with their start point, and the
+ * GET /export/sync's payload: starred routes with their start point, and the
  * activities since a time, from the fixtures; deleted activities and unstarred routes
  * are left out.
  */
@@ -10,18 +10,19 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { Database } from "../src/db/database.js";
 import { land } from "../src/db/raw.js";
-import { garminSyncExport, polylineStart } from "../src/export.js";
+import { polylineStart, syncExport } from "../src/export.js";
 
 const fixtures: Array<{ type: string; key: string; body: unknown }> = JSON.parse(
   readFileSync(new URL("./fixtures/payloads.json", import.meta.url), "utf8"),
 );
 
-test("polylineStart decodes the first point only", () => {
+test("polylineStart decodes the first point", () => {
   // Google's documented example starts at (38.5, -120.2).
   assert.deepEqual(polylineStart("_p~iF~ps|U_ulLnnqC_mqNvxq`@"), [38.5, -120.2]);
   assert.equal(polylineStart(""), null);
   assert.equal(polylineStart(null), null);
-  assert.equal(polylineStart("_p~iF"), null);
+  assert.equal(polylineStart(undefined), null);
+  assert.equal(polylineStart("redacted"), null, "a string that decodes to nowhere on Earth");
 });
 
 test("the export lists starred routes and activities since a time", async () => {
@@ -36,7 +37,7 @@ test("the export lists starred routes and activities since a time", async () => 
     );
     assert.ok(all.length >= 2, "fixtures hold several activities");
 
-    const none = await garminSyncExport(db, null);
+    const none = await syncExport(db, null);
     assert.equal(none.activities.length, 0, "no since, no activities");
     assert.deepEqual(none.starred_routes.map((r) => r.id).sort(), starred.map((r) => r.id).sort());
     for (const u of unstarred) assert.ok(!none.starred_routes.some((r) => r.id === u.id));
@@ -47,13 +48,16 @@ test("the export lists starred routes and activities since a time", async () => 
     }
 
     const cut = new Date(all[all.length - 1]!.start_date);
-    const recent = await garminSyncExport(db, cut);
-    assert.deepEqual(recent.activities.map((a) => a.id), all.filter((a) => new Date(a.start_date) >= cut).map((a) => a.id));
+    const recent = await syncExport(db, cut);
+    assert.deepEqual(
+      recent.activities.map((a) => a.id),
+      all.filter((a) => new Date(a.start_date) >= cut).map((a) => a.id),
+    );
     assert.ok(recent.activities.every((a) => typeof a.name === "string" && !Number.isNaN(Date.parse(a.start_date))));
 
     const gone = recent.activities[0]!.id;
     await db.run("UPDATE activity SET deleted_at = now() WHERE id = $1::BIGINT", [gone]);
-    assert.ok(!(await garminSyncExport(db, cut)).activities.some((a) => a.id === gone), "deleted activities are left out");
+    assert.ok(!(await syncExport(db, cut)).activities.some((a) => a.id === gone), "deleted activities are left out");
   } finally {
     db.close();
     rmSync(dir, { recursive: true, force: true });
