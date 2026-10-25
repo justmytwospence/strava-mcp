@@ -19,8 +19,7 @@ import { copyFile } from "node:fs/promises";
 import { join } from "node:path";
 import { Readable } from "node:stream";
 import type { Database } from "./db/database.js";
-
-const HOUR = 3_600_000;
+import { HOUR, MINUTE } from "./time.js";
 
 export class SnapshotPublisher {
   private dirty = true;
@@ -73,7 +72,7 @@ export class SnapshotPublisher {
         console.error("snapshot: publish failed:", err);
       }
     };
-    this.timer = setInterval(tick, 60_000);
+    this.timer = setInterval(tick, MINUTE);
     this.timer.unref();
     void tick();
   }

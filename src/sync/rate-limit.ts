@@ -13,6 +13,8 @@
  * and only lightly paced.
  */
 
+import { DAY, MINUTE, SECOND } from "../time.js";
+
 export type Priority = "interactive" | "incremental" | "backfill";
 
 /** Share of each limit a priority may consume: [15-minute, daily]. */
@@ -22,10 +24,9 @@ const SHARE: Record<Priority, [number, number]> = {
   backfill: [0.75, 0.75],
 };
 
-const FIFTEEN_MIN = 15 * 60_000;
-const DAY = 24 * 3_600_000;
+const FIFTEEN_MIN = 15 * MINUTE;
 /** Minimum spacing for uncounted calls of background priorities. */
-const UNCOUNTED_SPACING_MS = 1_000;
+const UNCOUNTED_SPACING_MS = SECOND;
 
 export interface Usage {
   usage15: number;
@@ -165,7 +166,7 @@ export class RateLimiter {
       const delay = this.delayFor(priority, method, path);
       if (delay === 0) break;
       if (this.now() + delay > deadline) return false;
-      await new Promise((r) => setTimeout(r, Math.min(delay, 30_000)));
+      await new Promise((r) => setTimeout(r, Math.min(delay, 30 * SECOND)));
     }
     this.lastStart[priority] = this.now();
     // Count the request locally until its response reports the real figure, so a burst

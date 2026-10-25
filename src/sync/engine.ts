@@ -19,12 +19,9 @@
 import type { Database } from "../db/database.js";
 import { RateLimitWaitError, limiter } from "../strava-client.js";
 import { StravaApiError } from "../errors.js";
+import { DAY, HOUR, MINUTE, SECOND } from "../time.js";
 import { Fetchers } from "./fetchers.js";
 import type { Priority } from "./rate-limit.js";
-
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
 
 /** The activity-list poll interval while a webhook subscription is active. */
 const PUSH_LIST_RECENT_EVERY = 6 * HOUR;
@@ -298,7 +295,7 @@ export class SyncEngine {
     // Wait for the limiter, but not so long that a more urgent job could not jump in.
     const delay = limiter.delayFor(cls, "GET", jobPath(job));
     if (delay > 0) {
-      await this.sleep(Math.min(delay, this.options.pollMs ?? 30_000));
+      await this.sleep(Math.min(delay, this.options.pollMs ?? 30 * SECOND));
       return "waiting";
     }
     this.current = job;

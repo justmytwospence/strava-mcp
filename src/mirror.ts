@@ -12,13 +12,11 @@ import { StravaApiError } from "./errors.js";
 import { RateLimitWaitError, requestRaw, safeJsonParse } from "./strava-client.js";
 import type { SyncEngine } from "./sync/engine.js";
 import type { FetchOptions, FetchResult } from "./sync/fetchers.js";
+import { DAY, HOUR, MINUTE, SECOND } from "./time.js";
 
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
 const FOREVER = Number.POSITIVE_INFINITY;
 /** How long a tool waits for the rate limiter before falling back to a stale copy. */
-const INTERACTIVE_WAIT_MS = 20_000;
+const INTERACTIVE_WAIT_MS = 20 * SECOND;
 
 export interface Provenance {
   source: "mirror" | "strava";
