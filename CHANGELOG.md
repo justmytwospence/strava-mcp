@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-10-25
+
 ### Added
 
 - `STRAVA_ROUTES_INTERVAL_MINUTES`: how often the route list (and each route's starred flag) is refreshed, default 60, minimum 5. Lower it when something consumes the starred flag promptly, such as garmin-mcp's course cleanup.
@@ -109,7 +111,8 @@ A release for strangers: a self-contained Compose stack, a documentation site, a
 
 - Initial server over the Strava API: activities, athletes, segments, routes with GPX and TCX export, streams, clubs, gear, uploads; resources and prompts.
 
-[Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.2.0...HEAD
+[Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.3.0...HEAD
+[4.3.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/justmytwospence/strava-mcp/compare/v3.1.1...v4.0.0
