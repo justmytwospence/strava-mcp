@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-10-25
+
 ### Changed
 
 - The route list is refreshed hourly instead of daily, so starring or unstarring a route (which Strava sends no webhook for) reaches the snapshot within about two hours.
