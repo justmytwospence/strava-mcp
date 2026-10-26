@@ -20,6 +20,8 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: node scripts/changelog-section.mjs "$GITHUB_REF_NAME" > /dev/null
+      - run: node -e 'if ("v" + require("./package.json").version !== process.env.GITHUB_REF_NAME) process.exit(1)'
       - run: pnpm run lint
       - run: pnpm run build
       - run: pnpm run typecheck

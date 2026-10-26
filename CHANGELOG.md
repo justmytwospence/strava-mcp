@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [4.4.1] - 2026-10-26
+
 ### Fixed
 
 - Enforce agent SQL with `BEGIN TRANSACTION READ ONLY` before extraction/preparation, serialized per-mirror access and reliable rollback/discard on cleanup failures. This blocks `EXPLAIN ANALYZE` mutations that statement-type checks alone accepted; actual pinned Node-driver tests use only synthetic in-memory/file sentinels.
