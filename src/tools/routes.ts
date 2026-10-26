@@ -2,8 +2,9 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
 import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
-import { mirrorResult, pageOf, textResult } from "../format.js";
+import { mirrorResult, mirrorTextResult, pageOf } from "../format.js";
 import { formatPaginationNote, paginationSchema } from "../pagination.js";
+import { stringId } from "../validation.js";
 import { READ_ONLY } from "./annotations.js";
 
 export function register(server: McpServer): void {
@@ -11,11 +12,13 @@ export function register(server: McpServer): void {
     "strava_list_athlete_routes",
     {
       title: "List Athlete Routes",
-      description: "List the authenticated athlete's routes.",
+      description:
+        "Page through stored routes. Refresh fetches all upstream pages; local per_page does not cap API request cost.",
       inputSchema: z.object({
         athlete_id: z.coerce
           .number()
           .int()
+          .positive()
           .optional()
           .describe(
             "Ignored: Strava serves only the authenticated athlete's routes, which the mirror holds. Kept for compatibility.",
@@ -42,7 +45,7 @@ export function register(server: McpServer): void {
       title: "Get Route",
       description: "Get detailed route information including distance, elevation gain, and estimated moving time.",
       inputSchema: z.object({
-        route_id: z.string().describe("The route ID"),
+        route_id: stringId.describe("The route ID"),
       }),
       annotations: READ_ONLY,
     },
@@ -62,14 +65,14 @@ export function register(server: McpServer): void {
       title: "Export Route as GPX",
       description: "Export a route as a GPX file. Returns raw GPX XML content.",
       inputSchema: z.object({
-        route_id: z.string().describe("The route ID"),
+        route_id: stringId.describe("The route ID"),
       }),
       annotations: READ_ONLY,
     },
     async ({ route_id }) => {
       try {
-        const { data } = await mirror().routeExport(route_id, "gpx");
-        return textResult(String(data));
+        const { data, meta } = await mirror().routeExport(route_id, "gpx");
+        return mirrorTextResult(String(data), meta);
       } catch (error) {
         return formatToolError(error);
       }
@@ -82,14 +85,14 @@ export function register(server: McpServer): void {
       title: "Export Route as TCX",
       description: "Export a route as a TCX file. Returns raw TCX XML content.",
       inputSchema: z.object({
-        route_id: z.string().describe("The route ID"),
+        route_id: stringId.describe("The route ID"),
       }),
       annotations: READ_ONLY,
     },
     async ({ route_id }) => {
       try {
-        const { data } = await mirror().routeExport(route_id, "tcx");
-        return textResult(String(data));
+        const { data, meta } = await mirror().routeExport(route_id, "tcx");
+        return mirrorTextResult(String(data), meta);
       } catch (error) {
         return formatToolError(error);
       }

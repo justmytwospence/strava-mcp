@@ -1,23 +1,27 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { mirror } from "../context.js";
 import { formatDate, formatDistance, formatDuration, formatElevation } from "../format.js";
 import type { DetailedSegment, SegmentEffort } from "../types.js";
+import { stringId } from "../validation.js";
+import { contextNote, localContext, promptText } from "./context.js";
 
 export function register(server: McpServer): void {
   server.registerPrompt(
     "segment-comparison",
     {
       title: "Segment Effort Comparison",
-      description: "Compare all your efforts on a Strava segment over time to identify trends and improvements.",
+      description:
+        "Compare up to 200 stored efforts on a segment with coverage/provenance, not necessarily all efforts. Local only, zero API calls; refresh via tools separately.",
       argsSchema: z.object({
-        segment_id: z.string().describe("The Strava segment ID to compare efforts on"),
+        segment_id: stringId.describe("The Strava segment ID to compare efforts on"),
       }),
     },
     async ({ segment_id }) => {
-      const m = mirror();
-      const segment = (await m.segment(String(segment_id))).data as DetailedSegment;
-      const efforts = (await m.segmentEfforts(String(segment_id), {}, 200)).data as SegmentEffort[];
+      const m = localContext();
+      const segmentResult = await m.segment(segment_id);
+      const effortsResult = await m.segmentEfforts(segment_id, {}, 200);
+      const segment = segmentResult.data as DetailedSegment;
+      const efforts = effortsResult.data as SegmentEffort[];
 
       const segmentInfo = [
         `Segment: ${segment.name}`,
@@ -51,9 +55,7 @@ export function register(server: McpServer): void {
         "Please compare my efforts on this segment over time. Analyze trends in elapsed time, heart rate, and power (if available). Identify my best and worst performances, what conditions may have contributed, and suggest pacing strategies for improvement.",
       ].join("\n");
 
-      return {
-        messages: [{ role: "user" as const, content: { type: "text" as const, text } }],
-      };
+      return promptText(`${contextNote(segmentResult, effortsResult)}\n\n${text}`);
     },
   );
 }

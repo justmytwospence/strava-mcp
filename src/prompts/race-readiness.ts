@@ -1,8 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { mirror } from "../context.js";
 import { formatDate, formatDistance, formatDuration, formatElevation, formatWeight } from "../format.js";
 import type { AthleteStats, DetailedAthlete, SummaryActivity } from "../types.js";
+import { contextNote, localContext, promptText } from "./context.js";
 
 function formatActivityTotal(
   label: string,
@@ -17,21 +17,27 @@ export function register(server: McpServer): void {
     "race-readiness",
     {
       title: "Race Readiness Assessment",
-      description: "Assess fitness and race readiness based on recent training history and athlete stats.",
+      description:
+        "Assess readiness using stored profile/stats and up to 200 activities over 90 days. Local only, zero API calls; preserve coverage limitations and refresh via tools separately.",
       argsSchema: z.object({
         distance: z
           .string()
+          .min(1)
+          .max(200)
           .optional()
           .describe("Target race distance (e.g. '5k', '10k', 'half marathon', 'marathon')"),
       }),
     },
     async ({ distance }) => {
-      const m = mirror();
-      const athlete = (await m.athlete()).data as DetailedAthlete;
-      const stats = (await m.athleteStats()).data as AthleteStats;
+      const m = localContext();
+      const athleteResult = await m.athlete();
+      const statsResult = await m.athleteStats();
+      const athlete = athleteResult.data as DetailedAthlete;
+      const stats = statsResult.data as AthleteStats;
 
       const after = Math.floor(Date.now() / 1000) - 90 * 86400;
-      const activities = (await m.listActivities({ after, page: 1, perPage: 200 })).data as SummaryActivity[];
+      const activitiesResult = await m.listActivities({ after, page: 1, perPage: 200 });
+      const activities = activitiesResult.data as SummaryActivity[];
 
       const profile = [
         `Athlete: ${athlete.firstname} ${athlete.lastname}`,
@@ -88,7 +94,7 @@ export function register(server: McpServer): void {
           formatGroup("  Runs", runs),
           formatGroup("  Rides", rides),
           "",
-          "Most recent activities:",
+          "Most recent activities (display limited to 10; totals above use the returned page):",
           ...recent,
         ].join("\n");
       }
@@ -109,9 +115,7 @@ export function register(server: McpServer): void {
         "Please assess my race readiness. Evaluate training volume, longest recent efforts, consistency, and overall fitness trajectory. Identify strengths and gaps in preparation, and suggest what to focus on in the remaining training period.",
       ].join("\n");
 
-      return {
-        messages: [{ role: "user" as const, content: { type: "text" as const, text } }],
-      };
+      return promptText(`${contextNote(athleteResult, statsResult, activitiesResult)}\n\n${text}`);
     },
   );
 }

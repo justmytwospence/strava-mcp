@@ -13,7 +13,7 @@ Please report security issues privately through GitHub's "Report a vulnerability
 - **Grafana and the notebook** (optional profiles) have full read access to the snapshot and weak or no authentication of their own, so Compose publishes them on the loopback interface only; expose them through something that authenticates.
 - **The whole `.env`** is passed to the server container through `env_file`, profile secrets included.
 - **The webhook path** is public by design and protected by its secret segment; an event only queues a re-fetch from Strava and is never stored as data.
-- **SQL from the model.** `strava_query` accepts one read-only statement on its own connection, with file and network access disabled at the DuckDB level, so a query cannot read the token file or reach the network; a 30-second interrupt and DuckDB's memory limit bound it.
+- **SQL from the model.** `strava_query` starts `BEGIN TRANSACTION READ ONLY` **before preparing** one statement, on a serialized dedicated connection, and always rolls back. Statement-type hints alone cannot prevent `EXPLAIN ANALYZE` mutations. Setup/cleanup failures fail closed; uncertain connections are discarded. File/network access is disabled and configuration locked at the DuckDB level. A 30-second interrupt, 5,000-row/output budgets and the configured DuckDB memory limit bound queries. Tool annotations are descriptive hints, not authorization or approval gates.
 - **Nothing leaves the host** except requests to Strava's API and, with the oauth profile, JWKS fetches from your identity provider. There is no telemetry.
 
 ## Hardening

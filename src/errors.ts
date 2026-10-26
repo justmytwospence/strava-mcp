@@ -1,3 +1,5 @@
+import { textResult } from "./format.js";
+
 export class StravaApiError extends Error {
   constructor(
     public statusCode: number,
@@ -38,7 +40,7 @@ export function formatToolError(error: unknown): {
   }
 
   return {
-    content: [{ type: "text", text: message }],
+    ...textResult(message),
     isError: true,
   };
 }

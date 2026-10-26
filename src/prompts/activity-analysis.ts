@@ -1,8 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { mirror } from "../context.js";
 import { formatDate, formatDistance, formatDuration, formatElevation, formatPace, getDefaultUnits } from "../format.js";
 import type { DetailedActivity, Stream } from "../types.js";
+import { stringId } from "../validation.js";
+import { contextNote, localContext, promptText } from "./context.js";
 
 function formatSplit(s: {
   split: number;
@@ -26,18 +27,22 @@ export function register(server: McpServer): void {
     {
       title: "Activity Deep Analysis",
       description:
-        "Fetch a Strava activity with streams and request a detailed analysis of pacing, effort, and performance.",
+        "Analyze a stored activity and stream summaries with provenance. Local only, zero API calls; missing streams are disclosed. Refresh via tools separately.",
       argsSchema: z.object({
-        activity_id: z.string().describe("The Strava activity ID to analyze"),
+        activity_id: stringId.describe("The Strava activity ID to analyze"),
       }),
     },
     async ({ activity_id }) => {
-      const activity = (await mirror().activity(String(activity_id))).data as DetailedActivity;
-
+      const m = localContext();
+      const activityResult = await m.activity(activity_id);
+      const activity = activityResult.data as DetailedActivity;
+      let provenance = contextNote(activityResult);
       let streamsText = "";
       try {
         const wanted = ["time", "distance", "heartrate", "altitude", "velocity_smooth", "cadence", "watts"];
-        const all = (await mirror().activityStreams(String(activity_id))).data as Record<string, Stream>;
+        const streamsResult = await m.activityStreams(activity_id);
+        provenance += `\n${contextNote(streamsResult)}`;
+        const all = streamsResult.data as Record<string, Stream>;
         const streamSummaries = wanted
           .filter((k) => Array.isArray(all[k]?.data) && all[k]!.data.length > 0)
           .map((k) => {
@@ -55,7 +60,8 @@ export function register(server: McpServer): void {
           });
         streamsText = `\nStream summaries:\n${streamSummaries.join("\n")}`;
       } catch {
-        streamsText = "\n(Stream data not available for this activity)";
+        streamsText =
+          "\n(Partial context: no stored stream data available; stream-dependent conclusions are unsupported.)";
       }
 
       const header = [
@@ -94,9 +100,7 @@ export function register(server: McpServer): void {
         "Please provide a detailed analysis of this activity. Cover pacing strategy, effort distribution, heart rate zones (if available), and any notable patterns in the splits or streams. Offer suggestions for improvement.",
       ].join("\n");
 
-      return {
-        messages: [{ role: "user" as const, content: { type: "text" as const, text } }],
-      };
+      return promptText(`${provenance}\n\n${text}`);
     },
   );
 }

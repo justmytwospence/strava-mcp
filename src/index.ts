@@ -53,20 +53,21 @@ const db = await Database.open({
 });
 
 // Carry today's rate-limit usage across restarts, and record every request.
-const last = await db.one<Record<string, number | string | null>>(
-  "SELECT *, epoch_ms(observed_at)::DOUBLE AS at_ms FROM rate_sample WHERE read_limit_15min IS NOT NULL ORDER BY observed_at DESC LIMIT 1",
-);
-if (last) {
-  const at = Number(last.at_ms);
-  const usage = (p: string): Usage => ({
-    usage15: Number(last[`${p}usage_15min`]),
-    usageDay: Number(last[`${p}usage_daily`]),
-    limit15: Number(last[`${p}limit_15min`]),
-    limitDay: Number(last[`${p}limit_daily`]),
-    observedAt: at,
-  });
-  limiter.restore(usage(""), usage("read_"));
+async function lastUsage(prefix: "" | "read_"): Promise<Usage | null> {
+  const last = await db.one<Record<string, number | string | null>>(
+    `SELECT *, epoch_ms(observed_at)::DOUBLE AS at_ms FROM rate_sample
+     WHERE ${prefix}limit_15min IS NOT NULL ORDER BY observed_at DESC LIMIT 1`,
+  );
+  if (!last) return null;
+  return {
+    usage15: Number(last[`${prefix}usage_15min`]),
+    usageDay: Number(last[`${prefix}usage_daily`]),
+    limit15: Number(last[`${prefix}limit_15min`]),
+    limitDay: Number(last[`${prefix}limit_daily`]),
+    observedAt: Number(last.at_ms),
+  };
 }
+limiter.restore(await lastUsage(""), await lastUsage("read_"));
 limiter.onSample((s) => {
   void db
     .run(`INSERT INTO rate_sample VALUES ($1::TIMESTAMPTZ, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`, [

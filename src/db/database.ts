@@ -13,6 +13,7 @@ import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { type DuckDBConnection, DuckDBInstance, type DuckDBValue } from "@duckdb/node-api";
 import { exitOnFatalDatabaseError } from "./fatal.js";
+import { ReadOnlyQuery } from "./read-only.js";
 import { MIGRATIONS } from "./schema.js";
 
 export type Row = Record<string, unknown>;
@@ -38,6 +39,7 @@ export interface DatabaseOptions {
 
 export class Database {
   private writeMutex = new Mutex();
+  readonly query = new ReadOnlyQuery(() => this.connect());
 
   private constructor(
     readonly instance: DuckDBInstance,
@@ -151,6 +153,7 @@ export class Database {
   }
 
   close(): void {
+    this.query.close();
     this.writer.closeSync();
     this.instance.closeSync();
   }

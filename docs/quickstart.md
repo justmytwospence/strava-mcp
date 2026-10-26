@@ -71,7 +71,7 @@ The mirror fills in phases, newest first, within Strava's rate limits, so what y
 |---|---|---|---|
 | Profile, zones, totals, routes, clubs, starred segments | minutes | One request each, a few more for long lists | A handful |
 | The complete activity list | minutes | Summaries of every activity, 200 per page | 1 read per 200 activities |
-| Details and streams, newest first | hours to days | Full detail (laps, splits, efforts) and full-resolution streams of each activity | About 1 read per activity for the detail. Streams have been observed to answer without rate-limit headers, so they do not appear to count; the server paces them lightly but does not rely on it |
+| Details and streams, newest first | hours to days | Full detail (laps, splits, efforts) and full-resolution streams of each activity | About 1 read per activity detail plus a stream request. Missing stream rate headers mean unknown accounting, not free calls; known quota pools and reserves still apply |
 | Zones | days | Heart-rate and power zone distribution, for activities that have them | 1 read per activity |
 | Kudos, comments, photos | days | Only for activities whose counts are non-zero | 1 read each, when non-zero |
 | Segments | days to weeks for segment-heavy riders | Detail and geometry of every segment you have an effort on | 2 reads per unique segment |

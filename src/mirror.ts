@@ -25,6 +25,9 @@ export interface Provenance {
   fetched_at: string | null;
   /** Set when the stored copy was served because Strava could not be asked. */
   stale?: string;
+  /** Coverage limitations and output truncation must travel with the data. */
+  partial?: string;
+  truncated?: boolean;
 }
 
 export interface Cached<T = unknown> {
@@ -131,6 +134,8 @@ export class Mirror {
     perPage: number;
   }): Promise<Cached<unknown[]>> {
     const meta = await this.freshList();
+    meta.partial =
+      "Stored activity list; history may be incomplete until backfill finishes. Check strava_sync_status coverage.";
     // Summaries are small and inline; only an activity without one (created through a
     // tool, not listed yet) needs its detail, which may be chunked.
     const rows = await this.db.all<{ id: string; body: string | null }>(
@@ -256,14 +261,22 @@ export class Mirror {
            AND ($2::VARCHAR IS NULL OR (e.effort->>'start_date_local') >= $2)
            AND ($3::VARCHAR IS NULL OR (e.effort->>'start_date_local') <= $3)
          ORDER BY e.effort->>'start_date_local' DESC LIMIT $4`,
-        [segmentId, range.start ?? null, range.end ?? null, perPage],
+        [segmentId, range.start ?? null, range.end ?? null, perPage + 1],
       );
-      return { data: rows.map((r) => safeJsonParse(r.effort)), meta: { source: "mirror", fetched_at: null } };
+      return {
+        data: rows.slice(0, perPage).map((r) => safeJsonParse(r.effort)),
+        meta: {
+          source: "mirror",
+          fetched_at: null,
+          partial: "Activity details may not cover all history; check sync status.",
+          truncated: rows.length > perPage,
+        },
+      };
     }
     const items = await this.f.segmentEfforts(segmentId, range, this.opts);
     return {
       data: items.slice(0, perPage).map((t) => safeJsonParse(t)),
-      meta: { source: "strava", fetched_at: new Date().toISOString() },
+      meta: { source: "strava", fetched_at: new Date().toISOString(), truncated: items.length > perPage },
     };
   }
 

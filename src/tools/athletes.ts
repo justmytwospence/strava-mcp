@@ -54,6 +54,7 @@ export function register(server: McpServer): void {
         athlete_id: z.coerce
           .number()
           .int()
+          .positive()
           .optional()
           .describe(
             "Ignored: Strava serves stats only for the authenticated athlete, which the mirror holds. Kept for compatibility.",
@@ -75,7 +76,8 @@ export function register(server: McpServer): void {
     "strava_list_starred_segments",
     {
       title: "List Starred Segments",
-      description: "List segments starred by the authenticated athlete.",
+      description:
+        "Page through stored starred segments. A stale refresh fetches the complete upstream list (multiple API pages); local per_page does not cap request cost.",
       inputSchema: z.object({
         ...paginationSchema,
       }),

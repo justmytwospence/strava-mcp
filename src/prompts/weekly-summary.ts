@@ -1,15 +1,16 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { mirror } from "../context.js";
 import { formatDate, formatDistance, formatDuration, formatElevation } from "../format.js";
 import type { SummaryActivity } from "../types.js";
+import { isoDate } from "../validation.js";
+import { contextNote, localContext, promptText } from "./context.js";
 
 function getMondayBefore(date: Date): Date {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay();
+  d.setUTCHours(0, 0, 0, 0);
+  const day = d.getUTCDay();
   const diff = day === 0 ? 6 : day - 1;
-  d.setDate(d.getDate() - diff);
+  d.setUTCDate(d.getUTCDate() - diff);
   return d;
 }
 
@@ -29,21 +30,24 @@ export function register(server: McpServer): void {
     "weekly-summary",
     {
       title: "Weekly Training Summary",
-      description: "Summarize training for a given week based on Strava activities.",
+      description:
+        "Summarize a UTC week from at most 200 stored activities, with coverage/provenance. Local only, zero API calls; refresh via tools separately if needed.",
       argsSchema: z.object({
-        week_start: z.string().optional().describe("ISO 8601 date for the start of the week (defaults to last Monday)"),
+        week_start: isoDate
+          .optional()
+          .describe("YYYY-MM-DD start of a seven-day UTC window (defaults to this Monday UTC)"),
       }),
     },
     async ({ week_start }) => {
       const start = week_start ? new Date(week_start) : getMondayBefore(new Date());
       const end = new Date(start);
-      end.setDate(end.getDate() + 7);
+      end.setUTCDate(end.getUTCDate() + 7);
 
       const after = Math.floor(start.getTime() / 1000);
       const before = Math.floor(end.getTime() / 1000);
 
-      const activities = (await mirror().listActivities({ after, before, page: 1, perPage: 200 }))
-        .data as SummaryActivity[];
+      const result = await localContext().listActivities({ after, before, page: 1, perPage: 200 });
+      const activities = result.data as SummaryActivity[];
 
       const startStr = start.toISOString().split("T")[0];
       const endStr = end.toISOString().split("T")[0];
@@ -62,9 +66,7 @@ export function register(server: McpServer): void {
         ].join("\n");
       }
 
-      return {
-        messages: [{ role: "user" as const, content: { type: "text" as const, text } }],
-      };
+      return promptText(`${contextNote(result)}\n\n${text}`);
     },
   );
 }

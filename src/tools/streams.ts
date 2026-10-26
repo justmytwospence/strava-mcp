@@ -4,6 +4,7 @@ import { ACTIVITY_STREAM_KEYS, SEGMENT_STREAM_KEYS } from "../constants.js";
 import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
 import { mirrorResult } from "../format.js";
+import { numericId, stringId } from "../validation.js";
 import { READ_ONLY } from "./annotations.js";
 
 function coerceArray<T extends z.ZodTypeAny>(schema: T) {
@@ -46,12 +47,13 @@ function selectStreams(raw: unknown, keys: string[] | null, maxPoints: number) {
   if (total <= maxPoints) {
     return { streams: wanted, _meta: { total_points: total, returned_points: total, downsampled: false } };
   }
-  const step = Math.ceil(total / maxPoints);
+  // Reserve a slot for the final point; the old stride plus endpoint could return maxPoints + 1.
+  const step = Math.ceil((total - 1) / (maxPoints - 1));
   const thinned: StreamSet = {};
   for (const [k, s] of Object.entries(wanted)) {
     const data: unknown[] = [];
     for (let i = 0; i < s.data.length; i += step) data.push(s.data[i]);
-    if (s.data.length > 0 && (s.data.length - 1) % step !== 0) data.push(s.data[s.data.length - 1]);
+    if (s.data.length === total && (total - 1) % step !== 0) data.push(s.data[total - 1]);
     thinned[k] = { ...s, data, original_size: s.data.length };
   }
   const returned = Math.max(0, ...Object.values(thinned).map((s) => s.data.length));
@@ -64,10 +66,10 @@ export function register(server: McpServer): void {
     {
       title: "Get Activity Streams",
       description:
-        "Get high-resolution time-series data for an activity (heart rate, power, cadence, altitude, GPS coordinates, etc.). Data is downsampled if too large.",
+        "Get high-resolution time-series data for an activity (heart rate, power, cadence, altitude, GPS coordinates, etc.). Data is downsampled if too large. Cache miss normally costs one API request. Missing stream rate headers mean unknown accounting, not free calls; check strava_sync_status or strava://mirror/budget first.",
       inputSchema: z.object({
-        activity_id: z.coerce.number().int().describe("The activity ID"),
-        keys: coerceArray(z.array(z.enum(ACTIVITY_STREAM_KEYS)).min(1)).describe(
+        activity_id: numericId.describe("The activity ID"),
+        keys: coerceArray(z.array(z.enum(ACTIVITY_STREAM_KEYS)).min(1).max(ACTIVITY_STREAM_KEYS.length)).describe(
           "Stream types to retrieve: time, distance, latlng, altitude, velocity_smooth, heartrate, cadence, watts, temp, moving, grade_smooth",
         ),
         max_points: maxPoints,
@@ -88,10 +90,13 @@ export function register(server: McpServer): void {
     "strava_get_segment_effort_streams",
     {
       title: "Get Segment Effort Streams",
-      description: "Get high-resolution time-series data for a segment effort.",
+      description:
+        "Get bounded/downsampled time-series data for a segment effort. Cache miss normally costs one API request; check strava_sync_status or strava://mirror/budget. Missing headers do not exempt requests from known quotas.",
       inputSchema: z.object({
-        effort_id: z.string().describe("The segment effort ID"),
-        keys: coerceArray(z.array(z.enum(ACTIVITY_STREAM_KEYS)).min(1)).describe("Stream types to retrieve"),
+        effort_id: stringId.describe("The segment effort ID"),
+        keys: coerceArray(z.array(z.enum(ACTIVITY_STREAM_KEYS)).min(1).max(ACTIVITY_STREAM_KEYS.length)).describe(
+          "Stream types to retrieve",
+        ),
         max_points: maxPoints,
       }),
       annotations: READ_ONLY,
@@ -110,10 +115,11 @@ export function register(server: McpServer): void {
     "strava_get_segment_streams",
     {
       title: "Get Segment Streams",
-      description: "Get GPS coordinates, distance, and altitude data for a segment.",
+      description:
+        "Get bounded/downsampled GPS, distance and altitude data for a segment. Cache miss normally costs one API request; check strava_sync_status or strava://mirror/budget first.",
       inputSchema: z.object({
-        segment_id: z.coerce.number().int().describe("The segment ID"),
-        keys: coerceArray(z.array(z.enum(SEGMENT_STREAM_KEYS)).min(1)).describe(
+        segment_id: numericId.describe("The segment ID"),
+        keys: coerceArray(z.array(z.enum(SEGMENT_STREAM_KEYS)).min(1).max(SEGMENT_STREAM_KEYS.length)).describe(
           "Stream types: latlng, distance, altitude",
         ),
         max_points: maxPoints,
@@ -134,9 +140,10 @@ export function register(server: McpServer): void {
     "strava_get_route_streams",
     {
       title: "Get Route Streams",
-      description: "Get GPS coordinates, distance, and altitude data for a route.",
+      description:
+        "Get bounded/downsampled GPS, distance and altitude data for a route. A cache refresh normally costs one API request; check strava_sync_status or strava://mirror/budget first.",
       inputSchema: z.object({
-        route_id: z.string().describe("The route ID"),
+        route_id: stringId.describe("The route ID"),
         max_points: maxPoints,
       }),
       annotations: READ_ONLY,

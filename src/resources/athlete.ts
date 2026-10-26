@@ -1,47 +1,28 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { mirror } from "../context.js";
-import type { AthleteStats, DetailedAthlete } from "../types.js";
+import { resourceResult } from "./result.js";
 
 export function register(server: McpServer): void {
   server.registerResource(
     "athlete-profile",
     "strava://athlete/profile",
     {
-      description: "Current authenticated athlete profile including name, location, bikes, and shoes.",
+      title: "Athlete Profile",
+      description:
+        "Authenticated athlete profile, bikes and shoes, with provenance. Cache-first; refresh costs one API request.",
       mimeType: "application/json",
     },
-    async (uri) => {
-      const athlete = (await mirror().athlete()).data as DetailedAthlete;
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            text: JSON.stringify(athlete, null, 2),
-            mimeType: "application/json",
-          },
-        ],
-      };
-    },
+    async (uri) => resourceResult(uri, await mirror().athlete()),
   );
-
   server.registerResource(
     "athlete-stats",
     "strava://athlete/stats",
     {
-      description: "Year-to-date and all-time activity totals for runs, rides, and swims.",
+      title: "Athlete Totals",
+      description:
+        "Year-to-date/all-time run, ride and swim totals with provenance. Cache-first; refresh costs one API request.",
       mimeType: "application/json",
     },
-    async (uri) => {
-      const stats = (await mirror().athleteStats()).data as AthleteStats;
-      return {
-        contents: [
-          {
-            uri: uri.href,
-            text: JSON.stringify(stats, null, 2),
-            mimeType: "application/json",
-          },
-        ],
-      };
-    },
+    async (uri) => resourceResult(uri, await mirror().athleteStats()),
   );
 }

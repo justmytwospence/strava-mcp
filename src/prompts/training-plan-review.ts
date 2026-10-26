@@ -1,37 +1,32 @@
 import type { McpServer } from "@modelcontextprotocol/server";
 import { z } from "zod";
-import { mirror } from "../context.js";
 import { formatDate, formatDistance, formatDuration, formatElevation } from "../format.js";
 import type { SummaryActivity } from "../types.js";
+import { lookbackDays } from "../validation.js";
+import { contextNote, localContext, promptText } from "./context.js";
 
 export function register(server: McpServer): void {
   server.registerPrompt(
     "training-plan-review",
     {
       title: "Training Plan Review",
-      description: "Review recent training load and suggest adjustments based on activity history.",
+      description:
+        "Review 1-365 days of stored training (at most 200 activities) with coverage/provenance. Local only, zero API calls; refresh with tools separately.",
       argsSchema: z.object({
-        days: z.string().optional().describe("Number of days to look back (default 30)"),
+        days: lookbackDays.optional().describe("Integer days to look back, 1-365 (default 30)"),
       }),
     },
     async ({ days }) => {
-      const numDays = days ? parseInt(days, 10) : 30;
+      const numDays = days ? Number(days) : 30;
       const after = Math.floor(Date.now() / 1000) - numDays * 86400;
 
-      const activities = (await mirror().listActivities({ after, page: 1, perPage: 200 })).data as SummaryActivity[];
+      const result = await localContext().listActivities({ after, page: 1, perPage: 200 });
+      const activities = result.data as SummaryActivity[];
 
       if (activities.length === 0) {
-        return {
-          messages: [
-            {
-              role: "user" as const,
-              content: {
-                type: "text" as const,
-                text: `No activities found in the last ${numDays} days. Please suggest how to get started with a training plan.`,
-              },
-            },
-          ],
-        };
+        return promptText(
+          `${contextNote(result)}\nNo stored activities found in the last ${numDays} days. Check coverage before inferring no training.`,
+        );
       }
 
       const byType: Record<string, SummaryActivity[]> = {};
@@ -63,9 +58,7 @@ export function register(server: McpServer): void {
         "Please review my training load. Analyze volume progression, recovery patterns, sport balance, and overtraining risk. Suggest adjustments to optimize performance and reduce injury risk.",
       ].join("\n");
 
-      return {
-        messages: [{ role: "user" as const, content: { type: "text" as const, text } }],
-      };
+      return promptText(`${contextNote(result)}\n\n${text}`);
     },
   );
 }

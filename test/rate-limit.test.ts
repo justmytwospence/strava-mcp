@@ -59,13 +59,53 @@ describe("rate limiter", () => {
     assert.ok(wait > 50_000 && wait < 60_000, `waited ${wait}`);
   });
 
-  test("responses without rate headers mark the path uncounted", () => {
+  test("missing headers remain unknown, never exempt from known pools/reserves", async () => {
     const l = new RateLimiter(() => T0);
-    l.observe("GET", "/athlete", 200, headers([75, 100]), "backfill");
-    assert.ok(l.delayFor("backfill", "GET", "/activities/1/streams") > 0);
+    assert.equal(l.status().overall, null);
+    l.observe("GET", "/athlete", 200, headers([74, 100]), "backfill");
+    assert.equal(await l.acquire("backfill", "GET", "/activities/1/streams", 0), true);
     l.observe("GET", "/activities/123/streams", 200, new Headers(), "backfill");
-    assert.ok(!l.isCounted("/activities/456/streams"));
+    assert.equal(l.isCounted("/activities/456/streams"), true);
+    assert.ok(l.delayFor("backfill", "GET", "/activities/456/streams") > 0);
     assert.equal(pathShape("/activities/456/streams"), "/activities/{id}/streams");
+    const status = l.status();
+    assert.deepEqual(status.unknown_accounting_paths, ["GET /activities/{id}/streams"]);
+    assert.equal((status.read as { usage15: number }).usage15, 75);
+    assert.equal((status.header_observations as { read: { usage15: number; observedAt: number } }).read.usage15, 74);
+  });
+
+  test("concurrent admissions cannot use the same last slot and out-of-order headers cannot undo reservations", async () => {
+    const l = new RateLimiter(() => T0);
+    l.observe("GET", "/athlete", 200, headers([97, 100]), "interactive");
+    assert.deepEqual(
+      await Promise.all([l.acquire("interactive", "GET", "/x", 0), l.acquire("interactive", "GET", "/x", 0)]),
+      [true, false],
+    );
+    l.observe("GET", "/x", 200, headers([96, 99]), "interactive");
+    assert.ok(l.delayFor("interactive", "GET", "/x") > 0);
+  });
+
+  test("unknown allowance is paced and malformed headers never become an allowance", async () => {
+    const l = new RateLimiter(() => T0);
+    assert.equal(await l.acquire("interactive", "GET", "/x", 0), true);
+    assert.equal(await l.acquire("interactive", "GET", "/x", 0), false);
+    const bad = headers([1, 1]);
+    bad.set("x-ratelimit-limit", "0,100");
+    bad.set("x-readratelimit-usage", "1x,2");
+    l.observe("GET", "/x", 200, bad, "interactive");
+    assert.equal(l.status().overall, null);
+    assert.equal(l.status().read, null);
+  });
+
+  test("429 honors Retry-After seconds/date and daily exhaustion across path shapes", () => {
+    for (const retry of ["1200", new Date(T0 + 1200_000).toUTCString()]) {
+      const l = new RateLimiter(() => T0);
+      l.observe("GET", "/x", 429, new Headers({ "retry-after": retry }), "interactive");
+      assert.equal(l.delayFor("interactive", "PUT", "/other"), 1200_000);
+    }
+    const l = new RateLimiter(() => T0);
+    l.observe("GET", "/x", 429, headers([1, 1000]), "interactive");
+    assert.equal(l.delayFor("interactive", "GET", "/x"), Date.UTC(2026, 9, 23) - T0);
   });
 
   test("writes are limited by the overall pool only", () => {

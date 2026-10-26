@@ -2,7 +2,13 @@ import { z } from "zod";
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./constants.js";
 
 export const paginationSchema = {
-  page: z.coerce.number().int().min(1).default(1).describe("Page number (default 1)"),
+  page: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(1_000_000)
+    .default(1)
+    .describe("Local page number (1-1000000, default 1); upstream refresh may traverse all pages"),
   per_page: z.coerce
     .number()
     .int()

@@ -4,6 +4,7 @@ import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
 import { mirrorResult, pageOf } from "../format.js";
 import { formatPaginationNote, paginationSchema } from "../pagination.js";
+import { numericId } from "../validation.js";
 import { READ_ONLY } from "./annotations.js";
 
 export function register(server: McpServer): void {
@@ -11,7 +12,8 @@ export function register(server: McpServer): void {
     "strava_list_athlete_clubs",
     {
       title: "List Athlete Clubs",
-      description: "List clubs the authenticated athlete belongs to.",
+      description:
+        "Page through stored clubs the athlete belongs to. Refresh fetches all upstream pages; local per_page does not cap API request cost.",
       inputSchema: z.object({
         ...paginationSchema,
       }),
@@ -35,7 +37,7 @@ export function register(server: McpServer): void {
       title: "Get Club",
       description: "Get detailed information about a club including description, member count, and sport type.",
       inputSchema: z.object({
-        club_id: z.coerce.number().int().describe("The club ID"),
+        club_id: numericId.describe("The club ID"),
       }),
       annotations: READ_ONLY,
     },

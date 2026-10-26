@@ -10,6 +10,7 @@ import { register as registerTrainingPlanReview } from "./prompts/training-plan-
 import { register as registerWeeklySummary } from "./prompts/weekly-summary.js";
 import { register as registerActivityResources } from "./resources/activities.js";
 import { register as registerAthleteResources } from "./resources/athlete.js";
+import { register as registerMirrorResources } from "./resources/mirror.js";
 import { register as registerReferenceResources } from "./resources/reference.js";
 import { register as registerRouteResources } from "./resources/routes.js";
 import { register as registerSegmentResources } from "./resources/segments.js";
@@ -24,6 +25,7 @@ import { register as registerSegments } from "./tools/segments.js";
 import { register as registerStreams } from "./tools/streams.js";
 import { register as registerUploads } from "./tools/uploads.js";
 import type { DetailedAthlete } from "./types.js";
+import { INSTRUCTIONS } from "./usage.js";
 
 export const SERVER_NAME = "strava-mcp-server";
 export const VERSION: string = createRequire(import.meta.url)("../package.json").version;
@@ -80,7 +82,7 @@ export async function resolveUnitsFromProfile(): Promise<void> {
  * Shared state (tokens, unit preference) lives at module scope.
  */
 export function createServer(): McpServer {
-  const server = new McpServer({ name: SERVER_NAME, version: VERSION });
+  const server = new McpServer({ name: SERVER_NAME, version: VERSION }, { instructions: INSTRUCTIONS });
 
   registerActivities(server);
   registerAthletes(server);
@@ -97,6 +99,7 @@ export function createServer(): McpServer {
   registerSegmentResources(server);
   registerRouteResources(server);
   registerReferenceResources(server);
+  registerMirrorResources(server);
 
   registerWeeklySummary(server);
   registerActivityAnalysis(server);

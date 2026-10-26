@@ -4,17 +4,19 @@ The sync engine is a durable job queue inside the mirror, one worker that drains
 
 ## Rate limits
 
-Strava enforces two pairs of limits, overall and non-upload reads, each with a 15-minute and a daily window: by default 200 / 2,000 overall and 100 / 1,000 for reads, and 400 / 4,000 and 200 / 2,000 after the self-service upgrade in the API settings ([Strava's rate limits page](https://developers.strava.com/docs/rate-limits/)). The 15-minute windows reset at :00, :15, :30 and :45 UTC, the daily one at midnight UTC. Usage is read from the `X-RateLimit-*` and `X-ReadRateLimit-*` headers of every response, carried forward, and reset at window boundaries; it survives restarts through the `rate_sample` table.
+Strava enforces two pairs of limits, overall and non-upload reads, each with a 15-minute and a daily window: by default 200 / 2,000 overall and 100 / 1,000 for reads, and 400 / 4,000 and 200 / 2,000 after the self-service upgrade in the API settings ([Strava's rate limits page](https://developers.strava.com/docs/rate-limits/)). The 15-minute windows reset at :00, :15, :30 and :45 UTC, the daily one at midnight UTC. The allowance comes only from valid `X-RateLimit-*` and `X-ReadRateLimit-*` headers. Last header observations survive restarts through `rate_sample`; each pool is restored independently. Every HTTP attempt reserves known pools locally, including failures and the one explicit 401 retry. These conservative estimates reset at window boundaries and can differ from header observations; local reservations since the last header are lost on restart. Other clients' requests are unknown until another header arrives.
 
 Each priority class may use only part of a window, so background work can never starve a person:
 
 | Class | Who | Share of the 15-minute window | Share of the day |
 |---|---|---|---|
-| interactive | tools, resources, prompts | 98% | 99.5% |
+| interactive | tools and cache-first resources | 98% | 99.5% |
 | incremental | new activities, anything from the last week | 85% | 90% |
 | backfill | everything older | 75% | 75% |
 
-Backfill also spreads what it may use evenly over the rest of each window rather than bursting. A 429 pauses every class until the next 15-minute boundary, or until midnight when a daily limit is spent. Some endpoints (activity streams, observed from their missing headers) do not count; they are only lightly paced.
+Backfill spreads what it may use over the rest of each window rather than bursting. A 429 pauses every class until the next 15-minute boundary (midnight if a daily limit is spent), or a later `Retry-After` time. Missing rate headers, including on streams, mean **unknown accounting, not quota-free calls**: known pools/reserves still apply. When a required pool has no known allowance, starts are paced to one per second per priority; this is local pacing, not an invented provider quota. `strava://mirror/budget` exposes observations, estimates, reserve shares, unknown pools/paths and reset/cooldown times without contacting Strava.
+
+Single-object refreshes normally cost one request; list refreshes may fetch all upstream pages before local slicing. Use local SQL aggregates before remote reads and avoid tight-loop retries/status polling. Interactive admission waits at most 20 seconds; a stored copy may be returned with a stale reason. Creates, updates, uploads and star changes are never replayed after ambiguous transport failures/5xx/429. Reconcile with a read before retrying a lost write response.
 
 ## Priorities
 

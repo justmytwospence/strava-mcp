@@ -10,7 +10,25 @@ on:
 permissions:
   contents: read
 jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - run: pnpm run lint
+      - run: pnpm run build
+      - run: pnpm run typecheck
+      - run: pnpm test
+      - run: pnpm run docs:gen
+      - run: git diff --exit-code -- docs/reference/tools.md docs/data/schema.md
+
   image:
+    needs: checks
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Fixed
+
+- Enforce agent SQL with `BEGIN TRANSACTION READ ONLY` before extraction/preparation, serialized per-mirror access and reliable rollback/discard on cleanup failures. This blocks `EXPLAIN ANALYZE` mutations that statement-type checks alone accepted; actual pinned Node-driver tests use only synthetic in-memory/file sentinels.
+- Missing rate headers no longer mark paths quota-free. Every HTTP attempt reserves known overall/read pools, with conservative local estimates separate from header observations, independent persisted pool restoration, existing background reserves and `Retry-After` cooldowns.
+- Validate IDs, date windows, prompt lookbacks and upload base64 at runtime. Keep downsampled streams within `max_points`; disclose partial coverage and bounded/truncated results.
+
+### Added
+
+- Server instructions plus a zero-call static usage guide listing all URI templates and prompt names with bounded examples/costs. Local schema, coverage/status and budget resources support clients that do not surface initialize instructions or template discovery.
+- Compatible structured results alongside existing text, with output schemas for stable SQL/schema shapes. Existing resources and prompts retain source/fetch/stale provenance; resource bodies are bounded without corrupting JSON/XML.
+- Offline MCP wire-contract, synthetic SQL safety, fake-transport budget/retry and concurrent admission regressions. Releases now require successful lint/build/typecheck/tests/generated-reference checks before publication.
+
+### Changed
+
+- Prompt retrieval uses stored data only: no API calls, refreshes or queued sync. Refresh missing context intentionally with tools after checking budget. Analysis prompts disclose incomplete history, the 200-item cap and text truncation.
+- Update/star tools advertise destructive replacement/removal accurately; hints do not enforce consent. Tool descriptions and status explain API costs, pagination, unknown quotas and safe retries.
+
 ## [4.3.0] - 2026-10-25
 
 ### Added

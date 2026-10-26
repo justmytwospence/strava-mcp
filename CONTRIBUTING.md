@@ -15,7 +15,7 @@ pnpm run typecheck   # tsc over src/, and over test/ and scripts/ (tsx --test do
 pnpm test            # node:test through tsx, about a minute
 ```
 
-CI runs lint, build, typecheck, the tests and the generated-docs check on every push and pull request; the pull request template lists the same.
+CI runs lint, build, typecheck, the tests and the generated-docs check on every push and pull request; publication is gated on the same checks for release tags. The pull request template lists the same. Tests use synthetic/scrubbed fixtures and fake transports, never live account calls; SQL regressions exercise the pinned Node driver on throw-away memory/file mirrors.
 
 Dependencies follow a seven-day release cooldown: pnpm installs a version only once it is a week old (`minimumReleaseAge` in `pnpm-workspace.yaml`), and every install, CI and the Docker build included, re-checks the lockfile against it. To take one release early, add `<package>@<version>` under `minimumReleaseAgeExclude` in the same change; it covers that version only. No dependency runs install scripts (`allowBuilds`).
 

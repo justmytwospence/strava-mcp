@@ -445,7 +445,7 @@ export class SyncEngine {
   }
 }
 
-/** A representative path for a job, so the limiter can tell counted from uncounted calls. */
+/** A representative path for rate-limit admission; missing headers never exempt a job. */
 function jobPath(job: Pick<Job, "kind" | "key">): string {
   switch (job.kind) {
     case "activity_streams":

@@ -5,6 +5,7 @@ import { mirror } from "../context.js";
 import { formatToolError } from "../errors.js";
 import { jsonResult, mirrorResult, pageOf } from "../format.js";
 import { formatPaginationNote, paginationSchema } from "../pagination.js";
+import { gearId, isoDateTime, numericId, orderedWindow } from "../validation.js";
 import { CREATE, READ_ONLY, UPDATE } from "./annotations.js";
 
 export function register(server: McpServer): void {
@@ -13,16 +14,27 @@ export function register(server: McpServer): void {
     {
       title: "List Athlete Activities",
       description:
-        "List the authenticated athlete's activities, newest first. Supports filtering by date range and pagination. Served from the local mirror (refreshed from Strava at most every 15 minutes).",
+        "List the authenticated athlete's activities, newest first. Supports filtering by date range and pagination. Served from stored history, which can be incomplete during backfill. A stale listing refresh traverses upstream pages; local page size does not cap API requests. Check strava_sync_status or strava://mirror/budget before broad refreshes; narrow dates/use local SQL first.",
       inputSchema: z.object({
-        before: z.coerce.number().int().optional().describe("Only activities before this epoch timestamp (seconds)"),
-        after: z.coerce.number().int().optional().describe("Only activities after this epoch timestamp (seconds)"),
+        before: z.coerce
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe("Only activities before this epoch timestamp (seconds)"),
+        after: z.coerce
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe("Only activities after this epoch timestamp (seconds)"),
         ...paginationSchema,
       }),
       annotations: READ_ONLY,
     },
     async ({ before, after, page, per_page }) => {
       try {
+        orderedWindow(after, before);
         const { data: activities, meta } = await mirror().listActivities({ before, after, page, perPage: per_page });
         const note = formatPaginationNote(activities.length, page, per_page);
         return mirrorResult({ activities, _pagination: note }, meta);
@@ -39,7 +51,7 @@ export function register(server: McpServer): void {
       description:
         "Get detailed information about a specific activity including description, calories, splits, laps, segment efforts, best efforts, and gear. Served from the local mirror; recent activities are refreshed from Strava.",
       inputSchema: z.object({
-        activity_id: z.coerce.number().int().describe("The activity ID"),
+        activity_id: numericId.describe("The activity ID"),
         include_all_efforts: z
           .boolean()
           .optional()
@@ -63,13 +75,14 @@ export function register(server: McpServer): void {
     "strava_create_activity",
     {
       title: "Create Activity",
-      description: "Create a manual activity entry. Requires activity:write scope.",
+      description:
+        "Create a manual activity entry (one API request). Requires activity:write scope and intent. Do not blindly retry a lost response; duplicate creation is possible.",
       inputSchema: z.object({
-        name: z.string().describe("The name of the activity"),
+        name: z.string().min(1).max(1000).describe("The name of the activity"),
         sport_type: z.enum(SPORT_TYPES).describe("The sport type (e.g. Run, Ride, Swim, Hike)"),
-        start_date_local: z
-          .string()
-          .describe("ISO 8601 date/time for activity start in local timezone (e.g. 2024-01-15T08:30:00Z)"),
+        start_date_local: isoDateTime.describe(
+          "ISO 8601 date/time for activity start in local timezone (e.g. 2024-01-15T08:30:00Z)",
+        ),
         elapsed_time: z.coerce.number().int().min(1).describe("Total elapsed time in seconds"),
         description: z.string().optional().describe("Activity description"),
         distance: z.coerce.number().min(0).optional().describe("Distance in meters"),
@@ -95,13 +108,16 @@ export function register(server: McpServer): void {
     {
       title: "Update Activity",
       description:
-        "Update an activity's mutable properties. Requires activity:write scope. Only provided fields are updated.",
+        "Update an activity's mutable properties. Requires activity:write scope. Only provided fields are updated (one API request); replacing values can destroy prior content. Reconcile lost responses before retrying.",
       inputSchema: z.object({
-        activity_id: z.coerce.number().int().describe("The activity ID to update"),
+        activity_id: numericId.describe("The activity ID to update"),
         name: z.string().optional().describe("New name"),
         sport_type: z.enum(SPORT_TYPES).optional().describe("New sport type"),
         description: z.string().optional().describe("New description"),
-        gear_id: z.string().optional().describe('Gear ID to associate (e.g. "b12345"), or "none" to remove'),
+        gear_id: z
+          .union([gearId, z.literal("none")])
+          .optional()
+          .describe('Gear ID to associate (e.g. "b12345"), or "none" to remove'),
         trainer: z.boolean().optional().describe("Whether this is a trainer activity"),
         commute: z.boolean().optional().describe("Whether this is a commute"),
         hide_from_home: z.boolean().optional().describe("Whether to mute this activity in the feed"),
@@ -125,9 +141,10 @@ export function register(server: McpServer): void {
     "strava_list_activity_comments",
     {
       title: "List Activity Comments",
-      description: "List comments on an activity.",
+      description:
+        "Page through stored comments. A cache refresh fetches the entire upstream list, potentially many API pages regardless of per_page.",
       inputSchema: z.object({
-        activity_id: z.coerce.number().int().describe("The activity ID"),
+        activity_id: numericId.describe("The activity ID"),
         ...paginationSchema,
       }),
       annotations: READ_ONLY,
@@ -148,9 +165,10 @@ export function register(server: McpServer): void {
     "strava_list_activity_kudoers",
     {
       title: "List Activity Kudoers",
-      description: "List athletes who gave kudos on an activity.",
+      description:
+        "Page through stored kudoers. A cache refresh fetches the entire upstream list, potentially many API pages regardless of per_page.",
       inputSchema: z.object({
-        activity_id: z.coerce.number().int().describe("The activity ID"),
+        activity_id: numericId.describe("The activity ID"),
         ...paginationSchema,
       }),
       annotations: READ_ONLY,
@@ -174,7 +192,7 @@ export function register(server: McpServer): void {
       description:
         "List laps of an activity. Each lap includes distance, time, speed, heart rate, watts, and elevation.",
       inputSchema: z.object({
-        activity_id: z.coerce.number().int().describe("The activity ID"),
+        activity_id: numericId.describe("The activity ID"),
       }),
       annotations: READ_ONLY,
     },
@@ -195,7 +213,7 @@ export function register(server: McpServer): void {
       title: "List Activity Zones",
       description: "Get heart rate and power zone distribution for an activity. Shows time spent in each zone.",
       inputSchema: z.object({
-        activity_id: z.coerce.number().int().describe("The activity ID"),
+        activity_id: numericId.describe("The activity ID"),
       }),
       annotations: READ_ONLY,
     },

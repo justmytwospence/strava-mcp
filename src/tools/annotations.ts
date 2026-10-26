@@ -26,8 +26,9 @@ export const CREATE: ToolAnnotations = {
   openWorldHint: true,
 };
 
-/** Changes something on Strava; calling it twice with the same input changes nothing more. */
+/** Replaces mutable fields/removes a star; repeated identical input has no additional intended effect. */
 export const UPDATE: ToolAnnotations = {
   ...CREATE,
+  destructiveHint: true,
   idempotentHint: true,
 };

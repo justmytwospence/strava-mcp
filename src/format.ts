@@ -4,14 +4,25 @@ import type { Provenance } from "./mirror.js";
 export function textResult(text: string): {
   content: Array<{ type: "text"; text: string }>;
 } {
-  const truncated = text.length > CHARACTER_LIMIT ? `${text.slice(0, CHARACTER_LIMIT)}\n\n[Response truncated]` : text;
+  const notice = "\n\n[Response truncated; narrow the request or use SQL aggregates]";
+  const truncated = text.length > CHARACTER_LIMIT ? `${text.slice(0, CHARACTER_LIMIT - notice.length)}${notice}` : text;
   return { content: [{ type: "text", text: truncated }] };
 }
 
 export function jsonResult(data: unknown): {
   content: Array<{ type: "text"; text: string }>;
+  structuredContent?: Record<string, unknown>;
 } {
-  return textResult(JSON.stringify(data, null, 2));
+  const text = JSON.stringify(data, null, 2);
+  const result = textResult(text);
+  // Do not smuggle an unbounded payload through the structured channel when text was capped.
+  return text.length <= CHARACTER_LIMIT
+    ? {
+        ...result,
+        structuredContent:
+          data && typeof data === "object" && !Array.isArray(data) ? (data as Record<string, unknown>) : { data },
+      }
+    : result;
 }
 
 export type Units = "metric" | "imperial";
@@ -104,7 +115,14 @@ export function formatDate(isoString: string): string {
 export function provenanceText(meta: Provenance): string {
   const when = meta.fetched_at ? ` (fetched from Strava ${meta.fetched_at})` : "";
   const origin = meta.source === "mirror" ? `[served from the local mirror${when}]` : "[fetched from Strava just now]";
-  return meta.stale ? `${origin} [stale: Strava could not be asked: ${meta.stale}]` : origin;
+  return [
+    origin,
+    meta.stale ? `[stale: Strava could not be asked: ${meta.stale}]` : "",
+    meta.partial ? `[coverage: ${meta.partial}]` : "",
+    meta.truncated ? "[Results truncated; narrow the window or query aggregates.]" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 }
 
 /** jsonResult plus a provenance line. */
@@ -113,10 +131,26 @@ export function mirrorResult(
   meta: Provenance,
 ): {
   content: Array<{ type: "text"; text: string }>;
+  structuredContent?: Record<string, unknown>;
 } {
   const result = jsonResult(data);
-  result.content.push({ type: "text", text: provenanceText(meta) });
+  result.content.push(...textResult(provenanceText(meta)).content);
+  const structured = { data, _provenance: meta };
+  if (result.structuredContent && JSON.stringify(structured).length <= CHARACTER_LIMIT)
+    result.structuredContent = structured;
+  else delete result.structuredContent;
   return result;
+}
+
+/** XML/text exports keep their original first text block; provenance is separate. */
+export function mirrorTextResult(data: string, meta: Provenance) {
+  const result = textResult(data);
+  result.content.push(...textResult(provenanceText(meta)).content);
+  const structured = { data, _provenance: meta };
+  return {
+    ...result,
+    ...(JSON.stringify(structured).length <= CHARACTER_LIMIT ? { structuredContent: structured } : {}),
+  };
 }
 
 /** Page through an already-complete list the way Strava's page/per_page would. */
