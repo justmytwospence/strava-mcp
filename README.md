@@ -5,7 +5,7 @@
 [![release](https://img.shields.io/github/v/release/justmytwospence/strava-mcp?sort=semver)](https://github.com/justmytwospence/strava-mcp/releases)
 [![npm](https://img.shields.io/npm/v/%40justmytwospence%2Fstrava-mcp)](https://www.npmjs.com/package/@justmytwospence/strava-mcp)
 [![image](https://img.shields.io/badge/ghcr.io-justmytwospence%2Fstrava--mcp-blue)](https://github.com/justmytwospence/strava-mcp/pkgs/container/strava-mcp)
-[![license](https://img.shields.io/github/license/justmytwospence/strava-mcp)](LICENSE)
+[![license](https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-blue)](LICENSE.md)
 
 **Ask an AI assistant anything about your Strava history, answered in milliseconds from a complete local mirror of your account.**
 
@@ -95,4 +95,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout, the checks (`pnpm run lin
 
 ## License
 
-[MIT](LICENSE)
+[PolyForm Noncommercial 1.0.0](LICENSE.md): free for personal use, research, education and noncommercial organizations. Commercial use requires a separate license; contact Spencer Boucher. Versions released before 2026-10-27 under MIT remain available under MIT.
+
+Outside contributions require agreeing to a contributor license agreement; open an issue before sending a pull request.

@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for looking into strava-mcp. Bug reports, questions and pull requests are welcome through the GitHub issue templates and pull requests.
+Thanks for looking into strava-mcp. Bug reports and questions are welcome through the GitHub issue templates. Outside contributions require agreeing to a contributor license agreement; open an issue before sending a pull request.
 
 ## Setup
 

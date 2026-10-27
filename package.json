@@ -23,7 +23,7 @@
     "type": "git",
     "url": "git+https://github.com/justmytwospence/strava-mcp.git"
   },
-  "license": "MIT",
+  "license": "PolyForm-Noncommercial-1.0.0",
   "author": "Spencer Boucher",
   "type": "module",
   "exports": {

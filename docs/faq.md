@@ -29,7 +29,7 @@ The mirror is a DuckDB file, so any DuckDB client exports it: the snapshot at `s
 
 ## What does it cost?
 
-The software is free (MIT). Running it costs whatever your host costs; the container is small. Strava's API is free to use within its limits, but since June 2026 Strava requires a Strava subscription for Standard-tier API access ([Strava's announcement](https://communityhub.strava.com/insider-journal-9/an-update-to-our-developer-program-13428)); check the [API settings page](https://www.strava.com/settings/api) for what applies to your account.
+The software is free for personal use, research, education and noncommercial organizations under the [PolyForm Noncommercial License 1.0.0](https://github.com/justmytwospence/strava-mcp/blob/main/LICENSE.md); commercial use requires a separate license. Versions released before 2026-10-27 remain available under MIT. Running it costs whatever your host costs; the container is small. Strava's API is free to use within its limits, but since June 2026 Strava requires a Strava subscription for Standard-tier API access ([Strava's announcement](https://communityhub.strava.com/insider-journal-9/an-update-to-our-developer-program-13428)); check the [API settings page](https://www.strava.com/settings/api) for what applies to your account.
 
 ## Is this allowed under Strava's terms?
 

@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+
+- Licensed under the [PolyForm Noncommercial License 1.0.0](https://github.com/justmytwospence/strava-mcp/blob/main/LICENSE.md) instead of MIT: free for personal use, research, education and noncommercial organizations; commercial use requires a separate license. Versions released before 2026-10-27 (up to 4.4.1) remain available under MIT.
+
 ## [4.4.1] - 2026-10-26
 
 ### Fixed

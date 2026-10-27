@@ -4,7 +4,7 @@ site_url: https://justmytwospence.github.io/strava-mcp/
 repo_url: https://github.com/justmytwospence/strava-mcp
 repo_name: justmytwospence/strava-mcp
 edit_uri: edit/main/docs/
-copyright: MIT licensed. Not affiliated with Strava.
+copyright: PolyForm Noncommercial 1.0.0. Not affiliated with Strava.
 
 theme:
   name: material
