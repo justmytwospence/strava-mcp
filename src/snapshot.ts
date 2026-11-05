@@ -32,6 +32,8 @@ export class SnapshotPublisher {
     readonly name = "strava.duckdb",
     /** Minimum time between snapshots while the sync is idle, and while it backfills. */
     private readonly intervals = { idle: HOUR, backfilling: 6 * HOUR },
+    /** Called with the snapshot's path after each publish (and once at start when one exists): the canonical export. */
+    private readonly onPublish?: (path: string) => Promise<void>,
   ) {
     this.path = join(db.options.snapshotDir, name);
     if (existsSync(this.path)) this.lastPublished = statSync(this.path).mtimeMs;
@@ -55,6 +57,16 @@ export class SnapshotPublisher {
     renameSync(tmp, this.path);
     this.dirty = false;
     this.lastPublished = Date.now();
+    await this.after();
+  }
+
+  private async after(): Promise<void> {
+    if (!this.onPublish) return;
+    try {
+      await this.onPublish(this.path);
+    } catch (err) {
+      console.error("export: failed:", err);
+    }
   }
 
   private async due(): Promise<boolean> {
@@ -76,6 +88,7 @@ export class SnapshotPublisher {
     };
     this.timer = setInterval(tick, MINUTE);
     this.timer.unref();
+    if (existsSync(this.path)) void this.after();
     void tick();
   }
 

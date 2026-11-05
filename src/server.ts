@@ -31,6 +31,11 @@ export const SERVER_NAME = "strava-mcp-server";
 export const VERSION: string = createRequire(import.meta.url)("../package.json").version;
 
 export function validateEnv(): void {
+  const exp = (process.env.STRAVA_EXPORT || "off").toLowerCase();
+  if (exp !== "off" && exp !== "canonical") {
+    console.error(`STRAVA_EXPORT must be "off" or "canonical", got "${exp}".`);
+    process.exit(1);
+  }
   const required = ["STRAVA_CLIENT_ID", "STRAVA_CLIENT_SECRET"];
   const missing = required.filter((key) => !process.env[key]);
 

@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-11-05
+
+### Added
+
+- `STRAVA_EXPORT=canonical`: a canonical-v1 activity export (a manifest plus one per-second Parquet file per activity, from the stream mirror), rebuilt after each snapshot publish and served at `/export/canonical/v1/` with its own `EXPORT_TOKEN`; `EXPORT_CORS_ORIGINS` allows browser apps such as Effort Curve to read it.
+
+### Fixed
+
+- The cadence comment: runs report one-leg steps per minute.
+
 ### Changed
 
 - Licensed under the [PolyForm Noncommercial License 1.0.0](https://github.com/justmytwospence/strava-mcp/blob/main/LICENSE.md) instead of MIT: free for personal use, research, education and noncommercial organizations; commercial use requires a separate license. Versions released before 2026-10-27 (up to 4.4.1) remain available under MIT.
@@ -135,6 +145,7 @@ A release for strangers: a self-contained Compose stack, a documentation site, a
 - Initial server over the Strava API: activities, athletes, segments, routes with GPX and TCX export, streams, clubs, gear, uploads; resources and prompts.
 
 [Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.3.0...HEAD
+[4.5.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.4.1...v4.5.0
 [4.3.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.0.0...v4.1.0

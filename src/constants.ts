@@ -93,7 +93,7 @@ export const STREAM_TYPE_DESCRIPTIONS: Record<StreamKey, string> = {
   altitude: "Elevation in meters",
   velocity_smooth: "Smoothed speed in meters per second",
   heartrate: "Heart rate in beats per minute",
-  cadence: "Cadence in rpm (cycling) or spm (running)",
+  cadence: "Cadence in rpm (cycling) or one-leg steps per minute (running)",
   watts: "Power output in watts",
   temp: "Temperature in degrees Celsius",
   moving: "Boolean flag indicating whether the athlete was moving",

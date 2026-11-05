@@ -4,6 +4,10 @@
 
 The first consumer is [garmin-mcp's Strava sync](../integrations/garmin-mcp.md), which renames Garmin activities after their Strava names and deletes the courses Strava made for routes that are no longer starred. Anything else may read it; the contract below is stable within a major version.
 
+## Canonical activity export
+
+With `STRAVA_EXPORT=canonical`, every activity's recorded stream is also written as one Parquet file (one row per whole second: `t`, `lat`, `lng`, `alt`, `dist`, `hr`, `power`, `cadence`) plus a `manifest.json`, in the canonical-v1 format of the Effort Curve app (the same as garmin-mcp's). It is rebuilt from each published snapshot and served at `GET /export/canonical/v1/manifest.json` and `GET /export/canonical/v1/activities/strava-<id>.parquet` with the bearer `EXPORT_TOKEN` (not `SNAPSHOT_TOKEN`; the route is disabled without it). `EXPORT_CORS_ORIGINS` lists the browser origins allowed to read it. Manual activities and activities without streams are left out; `power` is exported only when it came from a power meter; cadence is as Strava reports it (runs: one-leg steps per minute).
+
 ## Request
 
 ```text

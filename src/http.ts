@@ -8,6 +8,8 @@ import { timingSafeEqual } from "node:crypto";
 import { createMcpHonoApp } from "@modelcontextprotocol/hono";
 import type { McpHttpHandler } from "@modelcontextprotocol/server";
 import type { Context, Hono } from "hono";
+import { cors } from "hono/cors";
+import type { CanonicalExporter } from "./canonical.js";
 import type { Database } from "./db/database.js";
 import { syncExport } from "./export.js";
 import { SERVER_NAME, VERSION } from "./server.js";
@@ -30,6 +32,10 @@ export interface HttpOptions {
   mcpToken: string;
   /** Bearer token for /snapshot.duckdb and /export/sync; empty disables both. */
   snapshotToken: string;
+  /** The canonical export (STRAVA_EXPORT=canonical), its own bearer token and the origins a browser app may read it from. */
+  exporter: CanonicalExporter | null;
+  exportToken: string;
+  exportCorsOrigins: string[];
 }
 
 /** Constant-time comparison of an Authorization header with the expected bearer. */
@@ -43,6 +49,35 @@ export function createHttpApp(o: HttpOptions): Hono {
   const app = createMcpHonoApp({
     host: "0.0.0.0",
     allowedHosts: o.allowedHosts.length ? ["localhost", "127.0.0.1", ...o.allowedHosts] : undefined,
+  });
+
+  // The canonical export: CORS for the configured origins on these routes only (never /mcp or the snapshot).
+  const EXPORT_PREFIX = "/export/canonical/v1/";
+  app.use(`${EXPORT_PREFIX}*`, async (c, next) => {
+    await next();
+    if (
+      c.req.method === "OPTIONS" &&
+      c.req.header("access-control-request-private-network") === "true" &&
+      c.res.headers.has("access-control-allow-origin")
+    ) {
+      c.res.headers.set("access-control-allow-private-network", "true");
+    }
+  });
+  app.use(
+    `${EXPORT_PREFIX}*`,
+    cors({
+      origin: (origin) => (origin && o.exportCorsOrigins.includes(origin) ? origin : null),
+      allowMethods: ["GET", "HEAD", "OPTIONS"],
+      allowHeaders: ["Authorization"],
+      exposeHeaders: ["ETag"],
+      maxAge: 86400,
+    }),
+  );
+  app.on(["GET", "HEAD"], `${EXPORT_PREFIX}*`, (c) => {
+    if (!o.exportToken || !o.exporter)
+      return c.text("Export serving is disabled (set STRAVA_EXPORT=canonical and EXPORT_TOKEN)", 404);
+    if (!bearerMatches(o.exportToken, c.req.header("authorization"))) return c.text("Unauthorized", 401);
+    return o.exporter.serve(new URL(c.req.url).pathname.slice(EXPORT_PREFIX.length));
   });
 
   app.get("/health", (c) => c.json({ status: "ok", name: SERVER_NAME, version: VERSION }));

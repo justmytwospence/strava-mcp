@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { serve } from "@hono/node-server";
 import { createMcpHandler } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import { CanonicalExporter } from "./canonical.js";
 import { DEFAULT_DB_PATH } from "./constants.js";
 import { setMirror } from "./context.js";
 import { Database } from "./db/database.js";
@@ -88,7 +89,19 @@ limiter.onSample((s) => {
     .catch((err) => console.error("rate_sample insert failed:", err));
 });
 
-const snapshot = new SnapshotPublisher(db);
+const exporter =
+  (process.env.STRAVA_EXPORT || "off").toLowerCase() === "canonical"
+    ? new CanonicalExporter(
+        join(process.env.STRAVA_EXPORT_DIR || join(dirname(dbPath), "export"), "canonical-v1"),
+        `strava-mcp-export@${VERSION}`,
+      )
+    : null;
+const snapshot = new SnapshotPublisher(
+  db,
+  undefined,
+  undefined,
+  exporter ? (p) => exporter.run(p).then(() => undefined) : undefined,
+);
 const engine = new SyncEngine(db, { onChange: () => snapshot.markDirty() });
 setMirror(new Mirror(db, engine));
 
@@ -143,6 +156,12 @@ if (transport === "stdio") {
       .filter(Boolean),
     mcpToken: process.env.MCP_BEARER_TOKEN ?? "",
     snapshotToken: process.env.SNAPSHOT_TOKEN ?? "",
+    exporter,
+    exportToken: process.env.EXPORT_TOKEN ?? "",
+    exportCorsOrigins: (process.env.EXPORT_CORS_ORIGINS ?? "")
+      .split(",")
+      .map((o) => o.trim())
+      .filter(Boolean),
   });
 
   const httpServer = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, (info) => {
