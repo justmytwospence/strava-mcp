@@ -29,13 +29,14 @@ export interface ExportAuthOptions {
   noDelay?: boolean;
 }
 
-const HTML_HEADERS = {
+// Chrome applies form-action to the redirect after the POST, so the app's origin is listed too.
+const htmlHeaders = (origin: string) => ({
   "content-type": "text/html; charset=utf-8",
-  "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'",
+  "content-security-policy": `default-src 'none'; style-src 'unsafe-inline'; form-action 'self' ${origin}`,
   "x-frame-options": "DENY",
   "referrer-policy": "no-referrer",
   "cache-control": "no-store",
-};
+});
 
 export class ExportAuth {
   readonly mode: "oidc" | "builtin";
@@ -159,7 +160,7 @@ export class ExportAuth {
 <h1>Effort Curve</h1><p><strong>${esc(u.origin)}</strong> wants to read your activities from this server.</p>${err}
 <form method="post">${hidden}<label>Export token<input type="password" name="token" autocomplete="off" autofocus></label>
 <button name="action" value="approve">Approve</button><button name="action" value="deny">Deny</button></form>`;
-    return new Response(body, { status, headers: HTML_HEADERS });
+    return new Response(body, { status, headers: htmlHeaders(u.origin) });
   }
 
   private bad(msg: string): Response {

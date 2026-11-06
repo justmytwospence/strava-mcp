@@ -74,6 +74,7 @@ test("metadata, the approval page and redirect checks", async () => {
     const page = await app.request(`${BASE}/oauth/authorize?${new URLSearchParams(query())}`);
     assert.equal(page.status, 200);
     assert.match(page.headers.get("content-security-policy") ?? "", /default-src 'none'/);
+    assert.ok((page.headers.get("content-security-policy") ?? "").includes(`form-action 'self' ${ORIGIN}`));
     assert.match(await page.text(), /type="password"/);
     for (const bad of ["https://evil.example/oauth/callback", `${ORIGIN}/other`, `${ORIGIN}/oauth/callback?x=1`]) {
       const r2 = await app.request(`${BASE}/oauth/authorize?${new URLSearchParams({ ...query(), redirect_uri: bad })}`);
@@ -89,6 +90,7 @@ test("a wrong token and deny give no code", async () => {
   try {
     const r = await app.request(`${BASE}/oauth/authorize`, form({ ...query(), token: "nope", action: "approve" }));
     assert.equal(r.status, 401);
+    assert.ok((r.headers.get("content-security-policy") ?? "").includes(`form-action 'self' ${ORIGIN}`));
     assert.ok(!(await r.text()).includes("code="));
     const d = await app.request(`${BASE}/oauth/authorize`, form({ ...query(), action: "deny" }));
     assert.equal(d.status, 303);
