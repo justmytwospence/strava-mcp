@@ -32,6 +32,8 @@ Everything is an environment variable. With Compose they come from `.env` (copy 
 | `STRAVA_EXPORT_DIR` | `<data dir>/export` | Where it is written (`canonical-v1/` inside) |
 | `EXPORT_TOKEN` | unset | Bearer for `/export/canonical/v1/`; disabled without it |
 | `EXPORT_CORS_ORIGINS` | unset | Comma-separated browser origins allowed to read the export |
+| `EXPORT_OIDC_ISSUER` | unset | An `https://` OIDC issuer: browser apps sign in there and the export accepts its JWTs issued to `EXPORT_OIDC_CLIENT_ID`. Unset: the server runs its own one-page sign-in (approve with `EXPORT_TOKEN`) |
+| `EXPORT_OIDC_CLIENT_ID` | `effortcurve` | The OIDC client the browser app uses |
 | `SNAPSHOT_TOKEN` | unset | Serve the read-only snapshot at `GET /snapshot.duckdb` and the live export at `GET /export/sync` ([Export API](reference/export.md)) to this bearer token. Unset: neither is served over HTTP. The Grafana and notebook profiles read the file from the volume and do not need it. |
 | `STRAVA_SNAPSHOT_DIR` | `snapshot/` next to the mirror | Where the snapshot is published. |
 | `STRAVA_WEBHOOK_URL` | unset | Public HTTPS URL for Strava's push events, with a secret path (`https://strava.example.com/webhook/<random>`). The server registers the subscription itself. Unset: the activity list is polled every 15 minutes. See [How sync works](sync.md#webhook). |

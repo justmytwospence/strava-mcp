@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [4.6.1] - 2026-11-06
+
+### Added
+
+- Browser sign-in for the canonical export: `GET /export/canonical/v1/auth` describes an OAuth authorization-code + PKCE flow. By default the server runs a one-page approval (enter `EXPORT_TOKEN` once) and issues its own tokens; with `EXPORT_OIDC_ISSUER` it accepts JWTs from your identity provider. `Bearer EXPORT_TOKEN` still works. (The v4.6.0 tag failed its release checks and was never published; this is the same change.)
+
 ## [4.5.0] - 2026-11-05
 
 ### Added
@@ -145,6 +151,7 @@ A release for strangers: a self-contained Compose stack, a documentation site, a
 - Initial server over the Strava API: activities, athletes, segments, routes with GPX and TCX export, streams, clubs, gear, uploads; resources and prompts.
 
 [Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.3.0...HEAD
+[4.6.1]: https://github.com/justmytwospence/strava-mcp/compare/v4.5.0...v4.6.1
 [4.5.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.4.1...v4.5.0
 [4.3.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.1.0...v4.2.0

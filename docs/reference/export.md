@@ -8,6 +8,15 @@ The first consumer is [garmin-mcp's Strava sync](../integrations/garmin-mcp.md),
 
 With `STRAVA_EXPORT=canonical`, every activity's recorded stream is also written as one Parquet file (one row per whole second: `t`, `lat`, `lng`, `alt`, `dist`, `hr`, `power`, `cadence`) plus a `manifest.json`, in the canonical-v1 format of the Effort Curve app (the same as garmin-mcp's). It is rebuilt from each published snapshot and served at `GET /export/canonical/v1/manifest.json` and `GET /export/canonical/v1/activities/strava-<id>.parquet` with the bearer `EXPORT_TOKEN` (not `SNAPSHOT_TOKEN`; the route is disabled without it). `EXPORT_CORS_ORIGINS` lists the browser origins allowed to read it. Manual activities and activities without streams are left out; `power` is exported only when it came from a power meter; cadence is as Strava reports it (runs: one-leg steps per minute).
 
+### Signing in from a browser app
+
+Effort Curve connects with an OAuth 2.1 authorization-code flow (PKCE), so the user never pastes a token into the app. `GET /export/canonical/v1/auth` (no authentication, CORS) describes the sign-in: `{mode, issuer, authorization_endpoint, token_endpoint, client_id, scope}`.
+
+- **Built-in** (default): `/export/canonical/v1/oauth/authorize` shows a one-page approval where the user enters `EXPORT_TOKEN` once; `/export/canonical/v1/oauth/token` issues signed access (1 h) and refresh (90 days, rotated) tokens. The redirect must be `<origin>/oauth/callback` with the origin in `EXPORT_CORS_ORIGINS`. Changing `EXPORT_TOKEN` revokes every token.
+- **OIDC**: set `EXPORT_OIDC_ISSUER` (and optionally `EXPORT_OIDC_CLIENT_ID`, default `effortcurve`). The app signs in at your provider and the export accepts its JWTs whose `client_id` or `azp` is that client. Register a public PKCE client with the redirect `https://effortcurve.com/oauth/callback`, scopes `openid offline_access`, and allow the app's origin in the provider's CORS settings for the token endpoint.
+
+`Bearer EXPORT_TOKEN` keeps working for proxies and scripts.
+
 ## Request
 
 ```text
