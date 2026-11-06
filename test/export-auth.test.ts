@@ -132,7 +132,9 @@ test("the code flow, access, refresh, expiry and the static token", async () => 
     assert.equal(ok.status, 200);
     const tk = (await ok.json()) as { access_token: string; refresh_token: string };
     assert.equal((await manifest(app, tk.access_token)).status, 200);
-    const flipped = tk.access_token.slice(0, -1) + (tk.access_token.endsWith("A") ? "B" : "A");
+    const dot = tk.access_token.lastIndexOf(".") + 1; // the first signature char carries 6 significant bits; the last only 4
+    const flipped =
+      tk.access_token.slice(0, dot) + (tk.access_token[dot] === "A" ? "B" : "A") + tk.access_token.slice(dot + 1);
     assert.equal((await manifest(app, flipped)).status, 401);
     assert.equal((await manifest(app, tk.refresh_token)).status, 401);
     assert.equal((await manifest(app, "tok")).status, 200);
