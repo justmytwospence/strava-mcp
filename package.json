@@ -67,6 +67,7 @@
     "@modelcontextprotocol/server": "^2.3.0",
     "gpx-builder": "^6.0.0",
     "hono": "^4.13.13",
+    "jose": "^6.2.14",
     "zod": "^4.6.5"
   },
   "devDependencies": {

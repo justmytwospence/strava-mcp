@@ -12,6 +12,7 @@ import { cors } from "hono/cors";
 import type { CanonicalExporter } from "./canonical.js";
 import type { Database } from "./db/database.js";
 import { syncExport } from "./export.js";
+import { ExportAuth } from "./export-auth.js";
 import { SERVER_NAME, VERSION } from "./server.js";
 import type { SnapshotPublisher } from "./snapshot.js";
 import type { StravaWebhook, WebhookEvent } from "./webhook.js";
@@ -36,6 +37,8 @@ export interface HttpOptions {
   exporter: CanonicalExporter | null;
   exportToken: string;
   exportCorsOrigins: string[];
+  /** Sign-in for the export (built-in OAuth or OIDC); built from the export settings when omitted. */
+  exportAuth?: ExportAuth;
 }
 
 /** Constant-time comparison of an Authorization header with the expected bearer. */
@@ -67,16 +70,38 @@ export function createHttpApp(o: HttpOptions): Hono {
     `${EXPORT_PREFIX}*`,
     cors({
       origin: (origin) => (origin && o.exportCorsOrigins.includes(origin) ? origin : null),
-      allowMethods: ["GET", "HEAD", "OPTIONS"],
-      allowHeaders: ["Authorization"],
+      allowMethods: ["GET", "HEAD", "POST", "OPTIONS"],
+      allowHeaders: ["Authorization", "Content-Type"],
       exposeHeaders: ["ETag"],
       maxAge: 86400,
     }),
   );
-  app.on(["GET", "HEAD"], `${EXPORT_PREFIX}*`, (c) => {
-    if (!o.exportToken || !o.exporter)
-      return c.text("Export serving is disabled (set STRAVA_EXPORT=canonical and EXPORT_TOKEN)", 404);
-    if (!bearerMatches(o.exportToken, c.req.header("authorization"))) return c.text("Unauthorized", 401);
+  const exportAuth = o.exportAuth ?? new ExportAuth({ exportToken: o.exportToken, corsOrigins: o.exportCorsOrigins });
+  const exportBase = (c: Context) => {
+    const u = new URL(c.req.url);
+    const proto = c.req.header("x-forwarded-proto") ?? u.protocol.replace(":", "");
+    const host = c.req.header("x-forwarded-host") ?? c.req.header("host") ?? u.host;
+    return `${proto}://${host}${EXPORT_PREFIX.slice(0, -1)}`;
+  };
+  const exportOff = () => "Export serving is disabled (set STRAVA_EXPORT=canonical and EXPORT_TOKEN)";
+  // sign-in routes first: the catch-all below serves files
+  app.get(`${EXPORT_PREFIX}auth`, async (c) => {
+    if (!o.exportToken || !o.exporter) return c.text(exportOff(), 404);
+    try {
+      return c.json(await exportAuth.metadata(exportBase(c)), 200, { "cache-control": "no-store" });
+    } catch {
+      return c.text("The identity provider could not be reached", 502);
+    }
+  });
+  app.on(["GET", "POST"], `${EXPORT_PREFIX}oauth/authorize`, (c) =>
+    !o.exportToken || !o.exporter ? c.text(exportOff(), 404) : exportAuth.authorize(c.req.raw),
+  );
+  app.post(`${EXPORT_PREFIX}oauth/token`, (c) =>
+    !o.exportToken || !o.exporter ? c.text(exportOff(), 404) : exportAuth.token(c.req.raw),
+  );
+  app.on(["GET", "HEAD"], `${EXPORT_PREFIX}*`, async (c) => {
+    if (!o.exportToken || !o.exporter) return c.text(exportOff(), 404);
+    if (!(await exportAuth.allows(c.req.header("authorization")))) return c.text("Unauthorized", 401);
     return o.exporter.serve(new URL(c.req.url).pathname.slice(EXPORT_PREFIX.length));
   });
 

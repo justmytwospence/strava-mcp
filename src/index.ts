@@ -13,6 +13,7 @@ import { CanonicalExporter } from "./canonical.js";
 import { DEFAULT_DB_PATH } from "./constants.js";
 import { setMirror } from "./context.js";
 import { Database } from "./db/database.js";
+import { ExportAuth } from "./export-auth.js";
 import { createHttpApp } from "./http.js";
 import { Mirror } from "./mirror.js";
 import {
@@ -145,6 +146,10 @@ if (transport === "stdio") {
 } else if (transport === "http") {
   const port = Number(process.env.PORT || 8000);
   const handler = createMcpHandler(createServer);
+  const exportCorsOrigins = (process.env.EXPORT_CORS_ORIGINS ?? "")
+    .split(",")
+    .map((o) => o.trim())
+    .filter(Boolean);
   const app = createHttpApp({
     handler,
     db,
@@ -158,10 +163,13 @@ if (transport === "stdio") {
     snapshotToken: process.env.SNAPSHOT_TOKEN ?? "",
     exporter,
     exportToken: process.env.EXPORT_TOKEN ?? "",
-    exportCorsOrigins: (process.env.EXPORT_CORS_ORIGINS ?? "")
-      .split(",")
-      .map((o) => o.trim())
-      .filter(Boolean),
+    exportCorsOrigins,
+    exportAuth: new ExportAuth({
+      exportToken: process.env.EXPORT_TOKEN ?? "",
+      corsOrigins: exportCorsOrigins,
+      oidcIssuer: process.env.EXPORT_OIDC_ISSUER ?? "",
+      oidcClientId: process.env.EXPORT_OIDC_CLIENT_ID || undefined,
+    }),
   });
 
   const httpServer = serve({ fetch: app.fetch, port, hostname: "0.0.0.0" }, (info) => {

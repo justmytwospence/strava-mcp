@@ -36,6 +36,11 @@ export function validateEnv(): void {
     console.error(`STRAVA_EXPORT must be "off" or "canonical", got "${exp}".`);
     process.exit(1);
   }
+  const issuer = (process.env.EXPORT_OIDC_ISSUER || "").trim();
+  if (issuer && !issuer.startsWith("https://")) {
+    console.error(`EXPORT_OIDC_ISSUER must start with https://, got "${issuer}".`);
+    process.exit(1);
+  }
   const required = ["STRAVA_CLIENT_ID", "STRAVA_CLIENT_SECRET"];
   const missing = required.filter((key) => !process.env[key]);
 
