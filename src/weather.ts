@@ -17,8 +17,10 @@ export type WeatherBases = Record<WeatherApi, string>;
 
 export const STEP_S = 600;
 export const CHUNK = 50;
-export const PER_MINUTE = 400;
-export const PER_DAY = 8000;
+/** Open-Meteo reports how much of each window is left (X-RateLimit-*); a pause starts when less than this share remains */
+export const HEADROOM = 0.1;
+/** a pause up to this long is waited out in place; a longer one stops the run */
+export const MAX_WAIT_MS = 120_000;
 const NONE_DAYS = 30;
 const HOURLY = "temperature_2m,dew_point_2m,wind_speed_10m,wind_direction_10m";
 
@@ -53,11 +55,12 @@ export interface Point {
 
 export class WeatherFormatError extends Error {}
 
-/** Open-Meteo said slow down: `scope` is how long to stop for (a minute, until the next hour, until the next UTC day). */
+/** Open-Meteo said slow down (or is about to): `scope` is the window that ran out, `until` when to try again (ms since the epoch). */
 export class RateLimited extends Error {
   constructor(
     readonly scope: "minute" | "hour" | "day",
     message = `Open-Meteo rate limit (${scope})`,
+    readonly until?: number,
   ) {
     super(message);
   }
@@ -189,44 +192,58 @@ export function parseWeather(points: Point[], startMs: number, bodies: unknown[]
   return out;
 }
 
+/** Learns Open-Meteo's limits from its responses and keeps the run inside them, whoever else shares the IP address. */
 export interface Limiter {
+  /** before a request of `n` locations: waits out a short pause, throws RateLimited for a long one */
   take(n: number): Promise<void>;
+  /** after a response: the headers say how much of the tightest window is left and when it resets */
+  observe(res: Response): void;
+  /** Open-Meteo refused (429, or an error body): pause for Retry-After, else for the scope's window */
+  hit(res: Response | null, scope: "minute" | "hour" | "day"): void;
   /** calls taken through this limiter */
   total: number;
-}
-export interface LimiterState {
-  day: string;
-  used: number;
+  /** when the current pause ends (ms since the epoch), 0 for none */
+  until(): number;
+  /** how much of the pause is left, in ms */
+  pauseMs(): number;
 }
 const sleepMs = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+const header = (res: Response | null, k: string): number | null => {
+  const v = res?.headers?.get?.(k);
+  const n = v == null ? Number.NaN : Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+const scopeOf = (ms: number): "minute" | "hour" | "day" =>
+  ms <= MAX_WAIT_MS ? "minute" : ms <= 3_600_000 ? "hour" : "day";
 
-/** Keeps below PER_MINUTE calls in any rolling minute and PER_DAY in a UTC day; `state` is the day's count, kept by the caller. */
-export function createLimiter(
-  state: LimiterState,
-  now: () => number = Date.now,
-  sleep: (ms: number) => Promise<void> = sleepMs,
-): Limiter {
-  const stamps: [number, number][] = [];
+export function createLimiter(now: () => number = Date.now, sleep: (ms: number) => Promise<void> = sleepMs): Limiter {
+  let until = 0;
   const lim: Limiter = {
     total: 0,
+    until: () => until,
+    pauseMs: () => Math.max(0, until - now()),
     async take(n) {
       for (;;) {
-        const t = now();
-        const d = day(t);
-        if (state.day !== d) {
-          state.day = d;
-          state.used = 0;
-        }
-        if (state.used + n > PER_DAY) throw new RateLimited("day", "the day's weather requests are used up");
-        while (stamps.length && stamps[0]![0] <= t - 60_000) stamps.shift();
-        if (stamps.reduce((s, x) => s + x[1], 0) + n <= PER_MINUTE) {
-          stamps.push([t, n]);
-          state.used += n;
-          lim.total += n;
-          return;
-        }
-        await sleep(stamps[0]![0] + 60_000 - t + 1);
+        const wait = until - now();
+        if (wait <= 0) break;
+        if (wait > MAX_WAIT_MS) throw new RateLimited(scopeOf(wait), "Open-Meteo asked for a pause", until);
+        await sleep(wait + 1);
       }
+      lim.total += n;
+    },
+    observe(res) {
+      const remaining = header(res, "x-ratelimit-remaining");
+      const limit = header(res, "x-ratelimit-limit");
+      const reset = header(res, "x-ratelimit-reset");
+      if (remaining !== null && limit && reset !== null && remaining < limit * HEADROOM) {
+        until = Math.max(until, reset * 1000 + 1000);
+      }
+    },
+    hit(res, scope) {
+      const t = now();
+      const retry = header(res, "retry-after");
+      const fallback = scope === "day" ? nextDay(t) : scope === "hour" ? nextHour(t) : t + 60_000;
+      until = Math.max(until, retry !== null ? t + (retry + 1) * 1000 : fallback);
     },
   };
   return lim;
@@ -237,15 +254,13 @@ export interface FetchOpts {
   limiter: Limiter;
   now?: () => string;
   bases?: WeatherBases;
-  /** how a rate-limited minute is waited out (tests make it instant) */
-  sleep?: (ms: number) => Promise<void>;
 }
 
 async function getJson(url: string, n: number, o: FetchOpts): Promise<unknown> {
-  const sleep = o.sleep ?? sleepMs;
   for (let attempt = 0; ; attempt++) {
     await o.limiter.take(n);
     const res = await o.fetch(url);
+    o.limiter.observe(res);
     let body: unknown = null;
     let limited: RateLimited | null = null;
     if (res.status === 429) {
@@ -267,8 +282,9 @@ async function getJson(url: string, n: number, o: FetchOpts): Promise<unknown> {
       }
     }
     if (!limited) return body;
-    if (limited.scope !== "minute" || attempt >= 1) throw limited;
-    await sleep(60_000);
+    o.limiter.hit(res, limited.scope);
+    if (attempt >= 1 || o.limiter.pauseMs() > MAX_WAIT_MS)
+      throw new RateLimited(limited.scope, limited.message, o.limiter.until());
   }
 }
 
@@ -314,15 +330,14 @@ interface CacheEntry {
 }
 interface CacheData {
   version: 1;
-  quota: LimiterState;
   retry_after: string | null;
   entries: Record<string, CacheEntry>;
 }
 
 /** `weather-v1.json` beside the export: per activity the weather found for a given fingerprint (or null, with when it was
- * tried), the day's request count and a pause after Open-Meteo's limits. A sidecar file, never served. */
+ * tried) and a pause after Open-Meteo's limits. A sidecar file, never served. */
 export class WeatherCache {
-  data: CacheData = { version: 1, quota: { day: "", used: 0 }, retry_after: null, entries: {} };
+  data: CacheData = { version: 1, retry_after: null, entries: {} };
 
   constructor(readonly path: string) {
     if (existsSync(path)) {
@@ -393,7 +408,7 @@ export async function fillWeather(
   const now = o.now ?? Date.now;
   const retry = cache.data.retry_after;
   if (retry && now() < Date.parse(retry)) return stats;
-  const limiter = createLimiter(cache.data.quota, now, o.sleep);
+  const limiter = createLimiter(now, o.sleep);
   const todo = candidates
     .filter((c) => !c.indoor && !c.manual && !cache.done(c.id, c.fingerprint, now()))
     .sort((a, b) => (a.start_time < b.start_time ? 1 : a.start_time > b.start_time ? -1 : 0));
@@ -411,7 +426,6 @@ export async function fillWeather(
           limiter,
           now: () => new Date(now()).toISOString(),
           bases: o.bases,
-          sleep: o.sleep,
         });
       } catch (e) {
         if (e instanceof RateLimited) throw e;
@@ -432,7 +446,7 @@ export async function fillWeather(
   } catch (e) {
     if (!(e instanceof RateLimited)) throw e;
     const t = now();
-    const until = e.scope === "day" ? nextDay(t) : e.scope === "hour" ? nextHour(t) : t + 60_000;
+    const until = e.until ?? (e.scope === "day" ? nextDay(t) : e.scope === "hour" ? nextHour(t) : t + 60_000);
     cache.data.retry_after = new Date(until).toISOString();
     o.log?.(`weather: Open-Meteo limit (${e.scope}), pausing until ${cache.data.retry_after}`);
   } finally {

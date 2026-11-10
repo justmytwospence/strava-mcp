@@ -10,8 +10,6 @@ import {
   fillWeather,
   fmt4,
   limitScope,
-  PER_DAY,
-  PER_MINUTE,
   parseWeather,
   planPoints,
   RateLimited,
@@ -33,9 +31,31 @@ const FIXTURE = JSON.parse(readFileSync(new URL("./fixtures/weather-v1-fixture.j
   cases: Case[];
 };
 
-const res = (status: number, body: unknown) =>
-  ({ ok: status < 400, status, json: async () => body }) as unknown as Response;
-const noLimit = { take: async () => undefined, total: 0 };
+const res = (status: number, body: unknown, h: Record<string, string> = {}) =>
+  ({
+    ok: status < 400,
+    status,
+    json: async () => body,
+    headers: { get: (k: string) => h[k.toLowerCase()] ?? null },
+  }) as unknown as Response;
+const T0 = Date.UTC(2026, 10, 10, 12);
+const noLimit = createLimiter(
+  () => 0,
+  async () => undefined,
+);
+/** a limiter on a clock that only moves when it sleeps */
+const clocked = () => {
+  let t = T0;
+  const sleeps: number[] = [];
+  const limiter = createLimiter(
+    () => t,
+    async (ms) => {
+      sleeps.push(ms);
+      t += ms;
+    },
+  );
+  return { limiter, sleeps };
+};
 const trackOf = (s: Case["samples"]): Track => ({
   t: s.t,
   lat: s.lat,
@@ -144,15 +164,10 @@ test("parsing interpolates in time and takes the nearer hour for the direction",
   assert.throws(() => parseWeather([pt], 0, [{}]));
 });
 
-test("a limited minute is waited out once; an hour or a day stops at once; other errors are errors", async () => {
+test("a limit waits Retry-After once; a long one stops at once; other errors are errors", async () => {
   const c = FIXTURE.cases[0]!;
-  const run = (f: typeof fetch, sleeps: number[] = []) =>
-    fetchWeather(c.entry, trackOf(c.samples), {
-      fetch: f,
-      limiter: noLimit,
-      now: () => c.now,
-      sleep: async (ms) => void sleeps.push(ms),
-    });
+  const run = (f: typeof fetch, limiter = noLimit) =>
+    fetchWeather(c.entry, trackOf(c.samples), { fetch: f, limiter, now: () => c.now });
   assert.deepEqual(
     [
       "Daily API request limit exceeded",
@@ -162,33 +177,49 @@ test("a limited minute is waited out once; an hour or a day stops at once; other
     ["day", "hour", "minute"],
   );
   let calls = 0;
-  const sleeps: number[] = [];
+  const m = clocked();
   await assert.rejects(
     run(
       (async () => {
         calls++;
-        return res(200, { error: true, reason: "Minutely API request limit exceeded" });
+        return res(429, { error: true, reason: "Minutely API request limit exceeded" }, { "retry-after": "42" });
       }) as unknown as typeof fetch,
-      sleeps,
+      m.limiter,
     ),
     (e) => e instanceof RateLimited && e.scope === "minute",
   );
   assert.equal(calls, 2);
-  assert.deepEqual(sleeps, [60_000]);
+  assert.deepEqual(m.sleeps, [43_001]);
+  // without headers a minute is 60 s
+  const n = clocked();
+  await assert.rejects(
+    run(
+      (async () => res(429, { error: true, reason: "Minutely API request limit exceeded" })) as unknown as typeof fetch,
+      n.limiter,
+    ),
+    RateLimited,
+  );
+  assert.deepEqual(n.sleeps, [60_001]);
   calls = 0;
   const ok = c.exchanges[0]!.body;
-  const recovered = await run((async () =>
-    ++calls === 1
-      ? res(429, { error: true, reason: "Minutely API request limit exceeded" })
-      : res(200, ok)) as unknown as typeof fetch);
+  const recovered = await run(
+    (async () =>
+      ++calls === 1
+        ? res(429, { error: true, reason: "Minutely API request limit exceeded" }, { "retry-after": "5" })
+        : res(200, ok)) as unknown as typeof fetch,
+    clocked().limiter,
+  );
   assert.deepEqual(recovered, c.weather);
   calls = 0;
   await assert.rejects(
-    run((async () => {
-      calls++;
-      return res(429, { error: true, reason: "Daily API request limit exceeded" });
-    }) as unknown as typeof fetch),
-    (e) => e instanceof RateLimited && e.scope === "day",
+    run(
+      (async () => {
+        calls++;
+        return res(429, { error: true, reason: "Daily API request limit exceeded" }, { "retry-after": "9000" });
+      }) as unknown as typeof fetch,
+      clocked().limiter,
+    ),
+    (e) => e instanceof RateLimited && e.scope === "day" && e.until === T0 + 9_001_000,
   );
   assert.equal(calls, 1);
   await assert.rejects(run((async () => res(500, {})) as unknown as typeof fetch), /HTTP 500/);
@@ -198,27 +229,28 @@ test("a limited minute is waited out once; an hour or a day stops at once; other
   );
 });
 
-test("the limiter waits at the minute cap and stops at the day cap", async () => {
-  let t = Date.UTC(2026, 10, 10, 12);
-  const slept: number[] = [];
-  const lim = createLimiter(
-    { day: "", used: 0 },
-    () => t,
-    async (ms) => {
-      slept.push(ms);
-      t += ms;
-    },
-  );
-  for (let i = 0; i < PER_MINUTE / 50; i++) await lim.take(50);
-  assert.deepEqual(slept, []);
-  await lim.take(50);
-  assert.equal(slept.length, 1);
-  assert.ok(slept[0]! >= 59_000);
-  const day = createLimiter({ day: "2026-11-10", used: PER_DAY - 10 }, () => Date.UTC(2026, 10, 10, 12));
-  await assert.rejects(day.take(11), (e) => e instanceof RateLimited && e.scope === "day");
-  const state = { day: "2026-11-09", used: PER_DAY };
-  await createLimiter(state, () => Date.UTC(2026, 10, 10, 12)).take(11);
-  assert.deepEqual(state, { day: "2026-11-10", used: 11 });
+test("the limiter follows the headers: waits for a minute running low, stops for a day", async () => {
+  const { limiter: lim, sleeps } = clocked();
+  const h = (limit: number, remaining: number, reset: number) =>
+    res(200, null, {
+      "x-ratelimit-limit": String(limit),
+      "x-ratelimit-remaining": String(remaining),
+      "x-ratelimit-reset": String(reset / 1000),
+    });
+  await lim.take(5);
+  lim.observe(h(600, 300, T0 + 30_000));
+  await lim.take(5);
+  assert.deepEqual(sleeps, []);
+  lim.observe(h(600, 50, T0 + 30_000));
+  await lim.take(5);
+  assert.deepEqual(sleeps, [31_001]);
+  lim.observe(h(10_000, 900, T0 + 31_001 + 5 * 3_600_000));
+  await assert.rejects(lim.take(5), (e) => e instanceof RateLimited && e.scope === "day");
+  assert.equal(lim.total, 15);
+  const free = createLimiter(() => T0);
+  free.observe(res(200, null));
+  for (let i = 0; i < 100; i++) await free.take(50);
+  assert.equal(free.total, 5000);
 });
 
 // fill: the fixture's `track` body answers any request for up to its four points
