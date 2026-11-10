@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [4.7.0] - 2026-11-09
+
+### Added
+
+- The canonical export's manifest entries carry `tags` (`race`, `long_run`, `workout`) from the activity's Strava workout type, so the app can tell races (schema v1, optional for consumers).
+
 ## [4.6.2] - 2026-11-06
 
 ### Fixed
@@ -156,7 +162,8 @@ A release for strangers: a self-contained Compose stack, a documentation site, a
 
 - Initial server over the Strava API: activities, athletes, segments, routes with GPX and TCX export, streams, clubs, gear, uploads; resources and prompts.
 
-[Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.3.0...HEAD
+[Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.7.0...HEAD
+[4.7.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.6.2...v4.7.0
 [4.6.2]: https://github.com/justmytwospence/strava-mcp/compare/v4.6.1...v4.6.2
 [4.6.1]: https://github.com/justmytwospence/strava-mcp/compare/v4.5.0...v4.6.1
 [4.5.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.4.1...v4.5.0
