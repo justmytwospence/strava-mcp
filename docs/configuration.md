@@ -29,6 +29,7 @@ Everything is an environment variable. With Compose they come from `.env` (copy 
 | Variable | Default | Meaning |
 |---|---|---|
 | `STRAVA_EXPORT` | `off` | `canonical` writes the canonical activity export after each snapshot publish ([Export API](reference/export.md#canonical-activity-export)) |
+| `STRAVA_EXPORT_WEATHER` | `on` | With the canonical export: ask [Open-Meteo](https://open-meteo.com) for the weather along each outdoor activity's track (one point every 10 minutes: positions, altitudes and times are sent) and write it as `weather`; `off` writes `null` |
 | `STRAVA_EXPORT_DIR` | `<data dir>/export` | Where it is written (`canonical-v1/` inside) |
 | `EXPORT_TOKEN` | unset | Bearer for `/export/canonical/v1/`; disabled without it |
 | `EXPORT_CORS_ORIGINS` | unset | Comma-separated browser origins allowed to read the export |

@@ -95,6 +95,13 @@ const exporter =
     ? new CanonicalExporter(
         join(process.env.STRAVA_EXPORT_DIR || join(dirname(dbPath), "export"), "canonical-v1"),
         `strava-mcp-export@${VERSION}`,
+        {
+          memoryLimit: "256MB",
+          batch: 200,
+          weather: !["off", "0", "false", "no"].includes(
+            (process.env.STRAVA_EXPORT_WEATHER || "on").trim().toLowerCase(),
+          ),
+        },
       )
     : null;
 const snapshot = new SnapshotPublisher(

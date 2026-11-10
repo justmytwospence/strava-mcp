@@ -6,6 +6,9 @@
  *
  * Power is exported only when it came from a power meter (Strava's estimate would pollute power curves); cadence
  * is written as Strava reports it (runs: one-leg steps per minute) with cadence_unit saying so.
+ *
+ * Each entry's `weather` is the modelled weather along the track (src/weather.ts), filled in within a request budget and
+ * kept in weather-v1.json beside the export directory (never served).
  */
 import { createHash } from "node:crypto";
 import {
@@ -22,6 +25,7 @@ import {
 import { dirname, join } from "node:path";
 import { Readable } from "node:stream";
 import { DuckDBInstance } from "@duckdb/node-api";
+import { type Candidate, fillWeather, type Track, type Weather, WeatherCache } from "./weather.js";
 
 const SERVABLE = /^(manifest\.json|activities\/strava-\d+\.parquet)$/;
 
@@ -89,12 +93,71 @@ export function tagsOf(workoutType: unknown): string[] {
   return [];
 }
 
+const isIndoor = (a: Record<string, string | number | boolean | null>) => {
+  const type = String(a.sport_type ?? a.type ?? "");
+  return Boolean(a.trainer) || type === "VirtualRide" || type === "VirtualRun";
+};
+
+export interface ExporterOptions {
+  memoryLimit: string;
+  batch: number;
+  /** model the weather along each outdoor activity's track (Open-Meteo); off by default here, on in the server unless STRAVA_EXPORT_WEATHER=off */
+  weather?: boolean;
+  /** the fetch weather requests go through (tests inject one) */
+  weatherFetch?: typeof fetch;
+}
+
 export class CanonicalExporter {
   constructor(
     readonly outDir: string,
     private readonly importer: string,
-    private readonly opts = { memoryLimit: "256MB", batch: 200 },
+    private readonly opts: ExporterOptions = { memoryLimit: "256MB", batch: 200 },
   ) {}
+
+  /** Fill in the modelled weather of the activities that lack it (bounded, and never a reason to fail the export); each
+   * activity's weather as cached for its current fingerprint. */
+  private async weatherPass(
+    acts: Array<Record<string, string | number | boolean | null>>,
+    activitiesDir: string,
+  ): Promise<Map<string, Weather | null>> {
+    const cache = new WeatherCache(join(dirname(this.outDir), "weather-v1.json"));
+    const cands: Candidate[] = acts.map((a) => ({
+      id: `strava:${a.id}`,
+      fingerprint: String(a.fingerprint),
+      start_time: iso(Number(a.start_ms) + Number(a.t0) * 1000),
+      indoor: isIndoor(a),
+      manual: false,
+    }));
+    try {
+      cache.forget(new Set(cands.map((c) => c.id)));
+      const instance = await DuckDBInstance.create(":memory:");
+      const con = await instance.connect();
+      try {
+        const readTrack = async (id: string): Promise<Track> => {
+          const file = join(activitiesDir, `${id.replace(":", "-")}.parquet`).replace(/'/g, "''");
+          const r = (
+            await con.runAndReadAll(`SELECT t, lat, lng, alt FROM read_parquet('${file}') ORDER BY t`)
+          ).getRowObjectsJson() as Array<{
+            t: number;
+            lat: number | null;
+            lng: number | null;
+            alt: number | null;
+          }>;
+          return { t: r.map((x) => x.t), lat: r.map((x) => x.lat), lng: r.map((x) => x.lng), alt: r.map((x) => x.alt) };
+        };
+        const stats = await fillWeather(cache, cands, readTrack, this.opts.weatherFetch ?? fetch, {
+          log: (m) => console.error(m),
+        });
+        if (stats.fetched || stats.none || stats.failed) console.error(`export weather: ${JSON.stringify(stats)}`);
+      } finally {
+        con.closeSync();
+        instance.closeSync();
+      }
+    } catch (e) {
+      console.error("export weather failed:", e instanceof Error ? e.message : e);
+    }
+    return new Map(cands.map((c) => [c.id, cache.weather(c.id, c.fingerprint)]));
+  }
 
   get manifestPath(): string {
     return join(this.outDir, "manifest.json");
@@ -174,6 +237,9 @@ export class CanonicalExporter {
       instance.closeSync();
       rmSync(stage, { recursive: true, force: true });
     }
+    const weathers = this.opts.weather
+      ? await this.weatherPass(acts, activitiesDir)
+      : new Map<string, Weather | null>();
     const now = iso(Date.now());
     const entries = acts.map((a) => {
       const id = String(a.id);
@@ -189,10 +255,11 @@ export class CanonicalExporter {
         source_sport: type || null,
         name: a.name ?? null,
         device: a.device_name ?? null,
-        indoor: Boolean(a.trainer) || type === "VirtualRide" || type === "VirtualRun",
+        indoor: isIndoor(a),
         manual: false,
         cadence_unit: cadenceUnit(sport),
         tags: tagsOf(a.workout_type),
+        weather: weathers.get(`strava:${id}`) ?? null,
         n: Number(a.n),
         sha256: hashes.get(id) ?? old?.sha256 ?? sha256(join(activitiesDir, `strava-${id}.parquet`)),
         fingerprint: String(a.fingerprint),

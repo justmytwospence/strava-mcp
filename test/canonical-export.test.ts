@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { DuckDBInstance } from "@duckdb/node-api";
-import { CanonicalExporter, tagsOf } from "../src/canonical.js";
+import { CanonicalExporter, type ExporterOptions, tagsOf } from "../src/canonical.js";
 import { Database } from "../src/db/database.js";
 import { land } from "../src/db/raw.js";
 import { createHttpApp } from "../src/http.js";
@@ -152,3 +152,107 @@ test("the export route: disabled, unauthorized, served, and CORS only for listed
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+/** Open-Meteo for any request: 15 degrees C everywhere, from the query's dates and locations (or a failure). */
+function meteo(status = 200, reason = "") {
+  const urls: string[] = [];
+  const f = (async (input: string | URL | Request) => {
+    const url = String(input);
+    urls.push(url);
+    if (status !== 200) return new Response(JSON.stringify({ error: true, reason }), { status });
+    const q = new URL(url).searchParams;
+    const t0 = Date.parse(`${q.get("start_date")}T00:00:00Z`) / 1000;
+    const t1 = Date.parse(`${q.get("end_date")}T23:00:00Z`) / 1000;
+    const time: number[] = [];
+    for (let t = t0; t <= t1; t += 3600) time.push(t);
+    const fill = (v: number) => time.map(() => v);
+    const loc = {
+      elevation: 1234,
+      hourly: {
+        time,
+        temperature_2m: fill(15),
+        dew_point_2m: fill(7),
+        wind_speed_10m: fill(3),
+        wind_direction_10m: fill(270),
+      },
+    };
+    const n = q.get("latitude")!.split(",").length;
+    return new Response(JSON.stringify(n === 1 ? loc : Array.from({ length: n }, () => loc)));
+  }) as typeof fetch;
+  return { f, urls };
+}
+
+async function withSnapshot(fn: (dir: string, path: string) => Promise<void>) {
+  const dir = mkdtempSync(join(tmpdir(), "strava-canon-wx-"));
+  const db = await Database.open({ path: join(dir, "strava.duckdb"), snapshotDir: join(dir, "snapshot") });
+  try {
+    for (const f of fixtures) await db.transaction((tx) => land(tx, f.type, f.key, JSON.stringify(f.body)));
+    await db.transaction((tx) => land(tx, "activity_streams", "1001", streams(20)));
+    await db.transaction((tx) => land(tx, "activity_streams", "1005", streams(20)));
+    const pub = new SnapshotPublisher(db);
+    await pub.publish();
+    await fn(dir, pub.path);
+  } finally {
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const exporterIn = (dir: string, opts: Partial<ExporterOptions>) =>
+  new CanonicalExporter(join(dir, "export", "canonical-v1"), "strava-mcp-export@test", {
+    memoryLimit: "256MB",
+    batch: 200,
+    ...opts,
+  });
+const manifestOf = (exp: CanonicalExporter) => JSON.parse(readFileSync(exp.manifestPath, "utf8"));
+
+test("export carries modelled weather, from a sidecar cache it does not ask again", () =>
+  withSnapshot(async (dir, path) => {
+    const m = meteo();
+    const exp = exporterIn(dir, { weather: true, weatherFetch: m.f });
+    await exp.run(path);
+    const entries = manifestOf(exp).activities as Array<{ id: string; weather: Record<string, unknown[]> | null }>;
+    const run = entries.find((e) => e.id === "strava:1001")!;
+    assert.equal(run.weather?.version, 1);
+    assert.equal(run.weather?.source, "open-meteo");
+    assert.equal(run.weather?.api, "historical-forecast");
+    assert.equal(run.weather?.t[0], 0);
+    assert.equal(run.weather?.temp[0], 15);
+    assert.ok((run.weather?.t.length ?? 0) >= 2);
+    assert.ok(m.urls[0]!.includes("latitude=40.1235"), "positions as 4-decimal degrees");
+    assert.ok(existsSync(join(dir, "export", "weather-v1.json")), "a sidecar, beside the export");
+    assert.ok(!existsSync(join(exp.outDir, "weather-v1.json")));
+    const asked = m.urls.length;
+    await exp.run(path);
+    assert.equal(m.urls.length, asked);
+    await exporterIn(dir, { weather: true, weatherFetch: m.f }).run(path);
+    assert.equal(m.urls.length, asked, "a restart reads the same cache");
+  }));
+
+test("export weather off is null", () =>
+  withSnapshot(async (dir, path) => {
+    const exp = exporterIn(dir, {});
+    await exp.run(path);
+    for (const e of manifestOf(exp).activities) assert.equal(e.weather, null);
+    assert.ok(!existsSync(join(dir, "export", "weather-v1.json")));
+  }));
+
+test("a weather limit or failure does not fail the export, and a daily limit pauses it", () =>
+  withSnapshot(async (dir, path) => {
+    const daily = meteo(429, "Daily API request limit exceeded");
+    const exp = exporterIn(dir, { weather: true, weatherFetch: daily.f });
+    await exp.run(path);
+    for (const e of manifestOf(exp).activities) assert.equal(e.weather, null);
+    assert.equal(daily.urls.length, 1);
+    await exp.run(path);
+    assert.equal(daily.urls.length, 1, "paused until the next UTC day");
+    const dir2 = join(dir, "second");
+    const boom = exporterIn(dir2, {
+      weather: true,
+      weatherFetch: (async () => {
+        throw new Error("no network");
+      }) as unknown as typeof fetch,
+    });
+    await boom.run(path);
+    for (const e of manifestOf(boom).activities) assert.equal(e.weather, null);
+  }));
