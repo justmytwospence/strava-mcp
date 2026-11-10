@@ -80,6 +80,15 @@ interface Entry {
 const iso = (ms: number) => new Date(ms).toISOString();
 const sha256 = (path: string) => createHash("sha256").update(readFileSync(path)).digest("hex");
 
+/** The canonical tags of Strava's workout type: runs 1 race, 2 long run, 3 workout; rides 11 race, 12 workout. */
+export function tagsOf(workoutType: unknown): string[] {
+  const w = Number(workoutType);
+  if (w === 1 || w === 11) return ["race"];
+  if (w === 2) return ["long_run"];
+  if (w === 3 || w === 12) return ["workout"];
+  return [];
+}
+
 export class CanonicalExporter {
   constructor(
     readonly outDir: string,
@@ -117,7 +126,7 @@ export class CanonicalExporter {
         SELECT a.id::VARCHAR AS id, st.n::INTEGER AS n, st.t0::BIGINT AS t0,
                st.records || '|strava-api/' || a.id || '-' || left(coalesce(r.content_hash, ''), 12) AS fingerprint,
                epoch_ms(a.start_date)::BIGINT AS start_ms, a.utc_offset, a.sport_type, a.type, a.name, a.device_name,
-               coalesce(a.trainer, false) AS trainer
+               coalesce(a.trainer, false) AS trainer, a.workout_type
         FROM s.activity a
         JOIN st ON st.activity_id = a.id
         JOIN s.raw_latest r ON r.object_type = 'activity_streams' AND r.object_key = a.id::VARCHAR AND r.status = 'ok'
@@ -183,6 +192,7 @@ export class CanonicalExporter {
         indoor: Boolean(a.trainer) || type === "VirtualRide" || type === "VirtualRun",
         manual: false,
         cadence_unit: cadenceUnit(sport),
+        tags: tagsOf(a.workout_type),
         n: Number(a.n),
         sha256: hashes.get(id) ?? old?.sha256 ?? sha256(join(activitiesDir, `strava-${id}.parquet`)),
         fingerprint: String(a.fingerprint),

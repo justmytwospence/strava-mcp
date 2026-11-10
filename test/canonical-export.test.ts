@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { DuckDBInstance } from "@duckdb/node-api";
-import { CanonicalExporter } from "../src/canonical.js";
+import { CanonicalExporter, tagsOf } from "../src/canonical.js";
 import { Database } from "../src/db/database.js";
 import { land } from "../src/db/raw.js";
 import { createHttpApp } from "../src/http.js";
@@ -33,6 +33,13 @@ function streams(n: number, withDup = false): string {
   });
 }
 
+test("workout types become canonical tags", () => {
+  assert.deepEqual(
+    [0, 1, 2, 3, 10, 11, 12, 31, null].map((w) => tagsOf(w)),
+    [[], ["race"], ["long_run"], ["workout"], [], ["race"], ["workout"], [], []],
+  );
+});
+
 test("export writes per-second files, a manifest, and only what changed", async () => {
   const dir = mkdtempSync(join(tmpdir(), "strava-canon-"));
   const db = await Database.open({ path: join(dir, "strava.duckdb"), snapshotDir: join(dir, "snapshot") });
@@ -42,6 +49,7 @@ test("export writes per-second files, a manifest, and only what changed", async 
     await db.transaction((tx) => land(tx, "activity_streams", "1001", streams(20, true)));
     await db.transaction((tx) => land(tx, "activity_streams", "1005", streams(20)));
     await db.run("UPDATE activity SET device_watts = false WHERE id = 1005");
+    await db.run("UPDATE activity SET workout_type = 1 WHERE id = 1001");
     const pub = new SnapshotPublisher(db);
     await pub.publish();
     const exp = new CanonicalExporter(join(dir, "export", "canonical-v1"), "strava-mcp-export@test");
@@ -57,6 +65,8 @@ test("export writes per-second files, a manifest, and only what changed", async 
     const run = m.activities.find((a: { id: string }) => a.id === "strava:1001");
     assert.equal(run.sport, "trail_run");
     assert.equal(run.cadence_unit, "cycles");
+    assert.deepEqual(run.tags, ["race"]);
+    assert.deepEqual(m.activities.find((a: { id: string }) => a.id === "strava:1005").tags, []);
     assert.equal(run.n, 19, "the duplicate second collapsed");
     assert.ok(run.fingerprint.includes("|strava-api/1001-"));
     assert.match(run.start_time, /Z$/);
