@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [4.8.1] - 2026-11-10
+
 ### Changed
 
 - The weather fill follows Open-Meteo's `X-RateLimit-*` headers instead of fixed caps of 400 calls a minute and 8,000 a day: it pauses when less than a tenth of the tightest window is left (until the window resets), honors `Retry-After` on a 429, and so adapts to other clients on the same IP address. The 2,000 calls per publish and the pause kept in `weather-v1.json` stay.
@@ -172,7 +174,8 @@ A release for strangers: a self-contained Compose stack, a documentation site, a
 
 - Initial server over the Strava API: activities, athletes, segments, routes with GPX and TCX export, streams, clubs, gear, uploads; resources and prompts.
 
-[Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.8.0...HEAD
+[Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.8.1...HEAD
+[4.8.1]: https://github.com/justmytwospence/strava-mcp/compare/v4.8.0...v4.8.1
 [4.8.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.7.0...v4.8.0
 [4.7.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.6.2...v4.7.0
 [4.6.2]: https://github.com/justmytwospence/strava-mcp/compare/v4.6.1...v4.6.2
