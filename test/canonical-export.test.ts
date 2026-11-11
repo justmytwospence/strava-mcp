@@ -163,8 +163,15 @@ test("segment efforts and segments.json: stream-clock arithmetic, hidden and ear
     // the consumer's contract (effort-curves packages/schema/schema-v1.json, vendored): only its keys, in its order
     const schema = JSON.parse(readFileSync(new URL("./fixtures/schema-v1.json", import.meta.url), "utf8"));
     const order = (keys: string[], allowed: string[]) => {
-      assert.ok(keys.every((k) => allowed.includes(k)), `unknown keys: ${keys.filter((k) => !allowed.includes(k))}`);
-      assert.deepEqual(keys, allowed.filter((k) => keys.includes(k)), "keys in the schema's order");
+      assert.ok(
+        keys.every((k) => allowed.includes(k)),
+        `unknown keys: ${keys.filter((k) => !allowed.includes(k))}`,
+      );
+      assert.deepEqual(
+        keys,
+        allowed.filter((k) => keys.includes(k)),
+        "keys in the schema's order",
+      );
     };
     order(Object.keys(m), schema.manifest_keys);
     for (const a of m.activities) {
