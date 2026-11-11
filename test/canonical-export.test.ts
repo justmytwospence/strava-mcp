@@ -160,9 +160,22 @@ test("segment efforts and segments.json: stream-clock arithmetic, hidden and ear
       { segment: "strava:7005", t0: 290, t1: 340, from: "strava", src: "strava:1001" },
     ]);
     for (const a of m.activities) assert.ok(Array.isArray(a.segment_efforts), "always written");
+    // the consumer's contract (effort-curves packages/schema/schema-v1.json, vendored): only its keys, in its order
+    const schema = JSON.parse(readFileSync(new URL("./fixtures/schema-v1.json", import.meta.url), "utf8"));
+    const order = (keys: string[], allowed: string[]) => {
+      assert.ok(keys.every((k) => allowed.includes(k)), `unknown keys: ${keys.filter((k) => !allowed.includes(k))}`);
+      assert.deepEqual(keys, allowed.filter((k) => keys.includes(k)), "keys in the schema's order");
+    };
+    order(Object.keys(m), schema.manifest_keys);
+    for (const a of m.activities) {
+      order(Object.keys(a), schema.entry_keys);
+      for (const x of a.segment_efforts) order(Object.keys(x), schema.segment_effort_keys);
+    }
     const sj = JSON.parse(readFileSync(join(exp.outDir, "segments.json"), "utf8"));
     assert.equal(sj.schema_version, 1);
     assert.equal(sj.importer, "strava-mcp-export@test");
+    assert.deepEqual(Object.keys(sj), schema.segments_keys);
+    for (const x of sj.segments) assert.deepEqual(Object.keys(x), schema.segment_keys);
     assert.deepEqual(
       sj.segments.filter((x: { id: string }) => Number(x.id.slice(7)) >= 7000),
       [
