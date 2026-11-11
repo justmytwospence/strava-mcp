@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- The canonical export carries segment efforts: each manifest entry has `segment_efforts` (visible efforts on the stream's clock, `[]` when none), and a new `segments.json` beside the manifest lists the segments they reference. It is served at `/export/canonical/v1/segments.json`.
+
 ## [4.8.1] - 2026-11-10
 
 ### Changed

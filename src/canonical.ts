@@ -27,7 +27,7 @@ import { Readable } from "node:stream";
 import { DuckDBInstance } from "@duckdb/node-api";
 import { type Candidate, fillWeather, type Track, type Weather, WeatherCache } from "./weather.js";
 
-const SERVABLE = /^(manifest\.json|activities\/strava-\d+\.parquet)$/;
+const SERVABLE = /^(manifest\.json|segments\.json|activities\/strava-\d+\.parquet)$/;
 
 export function sportFromStrava(type: string, name = ""): string {
   switch (type.replace(/\s+/g, "").toLowerCase()) {
@@ -72,6 +72,15 @@ const FOOT = new Set(["run", "trail_run", "treadmill_run", "walk", "hike"]);
 const WHEEL = new Set(["ride", "gravel_ride", "mountain_bike", "indoor_ride", "virtual_ride"]);
 export const cadenceUnit = (sport: string): string | null =>
   FOOT.has(sport) ? "cycles" : WHEEL.has(sport) ? "rpm" : null;
+
+interface SegmentEffort {
+  segment: string;
+  t0: number;
+  t1: number;
+  from: "strava";
+  src: string;
+  pr_rank?: number;
+}
 
 interface Entry {
   id: string;
@@ -175,6 +184,8 @@ export class CanonicalExporter {
     const rows = async <T>(sql: string) => (await con.runAndReadAll(sql)).getRowObjectsJson() as T[];
     const hashes = new Map<string, string>();
     let acts: Array<Record<string, string | number | boolean | null>>;
+    let effortRows: Array<Record<string, string | number | null>> = [];
+    let segmentRows: Array<Record<string, string | number | boolean | number[] | null>> = [];
     const previous = new Map<string, Entry>();
     try {
       await con.run(`SET memory_limit = '${this.opts.memoryLimit}'`);
@@ -195,6 +206,23 @@ export class CanonicalExporter {
         JOIN s.raw_latest r ON r.object_type = 'activity_streams' AND r.object_key = a.id::VARCHAR AND r.status = 'ok'
         WHERE a.deleted_at IS NULL AND NOT coalesce(a.manual, false) AND st.n > 0
         ORDER BY a.start_date, a.id`);
+      const exported = new Set(acts.map((a) => String(a.id)));
+      effortRows = (
+        await rows<Record<string, string | number | null>>(`
+        WITH st AS (SELECT activity_id, min(time) AS t0 FROM s.activity_stream_point WHERE time IS NOT NULL GROUP BY 1)
+        SELECT e.activity_id::VARCHAR AS id, e.segment_id::VARCHAR AS seg, e.name,
+               (epoch(e.start_date) - epoch(a.start_date) - st.t0)::BIGINT AS t0, e.elapsed_time::BIGINT AS et, e.pr_rank
+        FROM s.activity_segment_effort e JOIN s.activity a ON a.id = e.activity_id JOIN st ON st.activity_id = e.activity_id
+        WHERE NOT coalesce(e.hidden, false) AND e.elapsed_time > 0 AND e.segment_id IS NOT NULL
+        ORDER BY 1, 4, 2`)
+      ).filter((e) => exported.has(String(e.id)) && Number(e.t0) >= 0);
+      const segIds = [...new Set(effortRows.map((e) => String(e.seg)))];
+      if (segIds.length > 0) {
+        segmentRows = await rows(`
+          SELECT id::VARCHAR AS id, name, activity_type, distance::DOUBLE AS distance, start_latlng::DOUBLE[] AS start_latlng,
+                 end_latlng::DOUBLE[] AS end_latlng, coalesce(starred, false) AS starred
+          FROM s.segment WHERE id IN (${segIds.map((i) => `${i}::BIGINT`).join(", ")})`);
+      }
       if (existsSync(this.manifestPath)) {
         for (const e of JSON.parse(readFileSync(this.manifestPath, "utf8")).activities as Entry[])
           previous.set(e.id, e);
@@ -241,6 +269,22 @@ export class CanonicalExporter {
       ? await this.weatherPass(acts, activitiesDir)
       : new Map<string, Weather | null>();
     const now = iso(Date.now());
+    const efforts = new Map<string, SegmentEffort[]>();
+    for (const e of effortRows) {
+      const t0 = Number(e.t0);
+      const list = efforts.get(String(e.id)) ?? [];
+      list.push({
+        segment: `strava:${e.seg}`,
+        t0,
+        t1: t0 + Number(e.et),
+        from: "strava",
+        src: `strava:${e.id}`,
+        ...(e.pr_rank != null ? { pr_rank: Number(e.pr_rank) } : {}),
+      });
+      efforts.set(String(e.id), list);
+    }
+    for (const list of efforts.values())
+      list.sort((x, y) => x.t0 - y.t0 || (x.segment < y.segment ? -1 : x.segment > y.segment ? 1 : 0));
     const entries = acts.map((a) => {
       const id = String(a.id);
       const old = previous.get(`strava:${id}`);
@@ -260,6 +304,7 @@ export class CanonicalExporter {
         cadence_unit: cadenceUnit(sport),
         tags: tagsOf(a.workout_type),
         weather: weathers.get(`strava:${id}`) ?? null,
+        segment_efforts: efforts.get(id) ?? [],
         n: Number(a.n),
         sha256: hashes.get(id) ?? old?.sha256 ?? sha256(join(activitiesDir, `strava-${id}.parquet`)),
         fingerprint: String(a.fingerprint),
@@ -273,6 +318,35 @@ export class CanonicalExporter {
       JSON.stringify({ schema_version: 1, importer: this.importer, generated_at: now, activities: entries }, null, 1),
     );
     renameSync(tmpManifest, this.manifestPath);
+    const known = new Map(segmentRows.map((r) => [String(r.id), r]));
+    const latlng = (v: unknown) =>
+      Array.isArray(v) && v.length >= 2
+        ? [Math.round(Number(v[0]) * 1e6) / 1e6, Math.round(Number(v[1]) * 1e6) / 1e6]
+        : null;
+    const names = new Map(effortRows.map((e) => [String(e.seg), e.name ?? null]));
+    const segments = [...names.keys()]
+      .sort((x, y) => (BigInt(x) < BigInt(y) ? -1 : BigInt(x) > BigInt(y) ? 1 : 0))
+      .map((id) => {
+        const r = known.get(id);
+        const type = r?.activity_type;
+        return {
+          id: `strava:${id}`,
+          name: r ? (r.name ?? null) : (names.get(id) ?? null),
+          sport: type === "Run" ? "run" : type === "Ride" ? "ride" : null,
+          distance: r?.distance != null ? Number(r.distance) : null,
+          start: latlng(r?.start_latlng),
+          end: latlng(r?.end_latlng),
+          starred: r ? Boolean(r.starred) : false,
+          from: "strava",
+          created_from: null,
+        };
+      });
+    const tmpSegments = join(this.outDir, "segments.json.tmp");
+    writeFileSync(
+      tmpSegments,
+      JSON.stringify({ schema_version: 1, importer: this.importer, generated_at: now, segments }, null, 1),
+    );
+    renameSync(tmpSegments, join(this.outDir, "segments.json"));
     const keep = new Set(entries.map((e) => e.file.slice("activities/".length)));
     let removed = 0;
     for (const f of readdirSync(activitiesDir)) {
@@ -291,7 +365,8 @@ export class CanonicalExporter {
       return new Response("Not found", { status: 404 });
     return new Response(Readable.toWeb(createReadStream(path)) as ReadableStream, {
       headers: {
-        "content-type": rel === "manifest.json" ? "application/json" : "application/octet-stream",
+        "content-type":
+          rel === "manifest.json" || rel === "segments.json" ? "application/json" : "application/octet-stream",
         "content-length": String(statSync(path).size),
       },
     });

@@ -101,6 +101,130 @@ test("export writes per-second files, a manifest, and only what changed", async 
   }
 });
 
+test("segment efforts and segments.json: stream-clock arithmetic, hidden and early efforts dropped", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "strava-canon-seg-"));
+  const db = await Database.open({ path: join(dir, "strava.duckdb"), snapshotDir: join(dir, "snapshot") });
+  try {
+    for (const f of fixtures) await db.transaction((tx) => land(tx, f.type, f.key, JSON.stringify(f.body)));
+    const detail = structuredClone(fixtures.find((f) => f.type === "activity_detail" && f.key === "1001")!.body) as {
+      start_date: string;
+      segment_efforts: Array<Record<string, unknown>>;
+    };
+    const t = Date.parse(detail.start_date);
+    const at = (s: number) => new Date(t + s * 1000).toISOString().replace(".000Z", "Z");
+    const seg = (id: number, name: string, extra: Record<string, unknown> = {}) => ({
+      id,
+      name,
+      activity_type: "Run",
+      distance: 500.5,
+      start_latlng: [40.12345678, -105.1234561],
+      end_latlng: [40.2, -105.3],
+      starred: true,
+      ...extra,
+    });
+    const effort = (id: number, s: number, et: number, segment: unknown, extra: Record<string, unknown> = {}) => ({
+      ...detail.segment_efforts[0],
+      id,
+      name: "effort name",
+      start_date: at(s),
+      elapsed_time: et,
+      hidden: false,
+      pr_rank: null,
+      segment,
+      ...extra,
+    });
+    detail.segment_efforts = [
+      effort(9001, 130, 40, seg(7002, "Second", { activity_type: "Ride", starred: false }), { pr_rank: 1 }),
+      effort(9002, 100, 60, seg(7001, "First")),
+      effort(9003, 200, 30, seg(7003, "Hidden"), { hidden: true }),
+      effort(9004, 5, 20, seg(7004, "Before the first sample")),
+      effort(9005, 300, 50, seg(7005, "Unlisted segment")),
+    ];
+    await db.transaction((tx) => land(tx, "activity_detail", "1001", JSON.stringify(detail)));
+    await db.run("DELETE FROM segment WHERE id = 7005");
+    await db.transaction((tx) => land(tx, "activity_streams", "1001", streams(20)));
+    const pub = new SnapshotPublisher(db);
+    await pub.publish();
+    const exp = new CanonicalExporter(join(dir, "export", "canonical-v1"), "strava-mcp-export@test");
+    await exp.run(pub.path);
+    const m = JSON.parse(readFileSync(exp.manifestPath, "utf8"));
+    const e = m.activities.find((a: { id: string }) => a.id === "strava:1001");
+    assert.deepEqual(Object.keys(e).slice(Object.keys(e).indexOf("weather"), Object.keys(e).indexOf("weather") + 2), [
+      "weather",
+      "segment_efforts",
+    ]);
+    // streams start at time = 10: t0 = offset - 10
+    assert.deepEqual(e.segment_efforts, [
+      { segment: "strava:7001", t0: 90, t1: 150, from: "strava", src: "strava:1001" },
+      { segment: "strava:7002", t0: 120, t1: 160, from: "strava", src: "strava:1001", pr_rank: 1 },
+      { segment: "strava:7005", t0: 290, t1: 340, from: "strava", src: "strava:1001" },
+    ]);
+    for (const a of m.activities) assert.ok(Array.isArray(a.segment_efforts), "always written");
+    const sj = JSON.parse(readFileSync(join(exp.outDir, "segments.json"), "utf8"));
+    assert.equal(sj.schema_version, 1);
+    assert.equal(sj.importer, "strava-mcp-export@test");
+    assert.deepEqual(
+      sj.segments.filter((x: { id: string }) => Number(x.id.slice(7)) >= 7000),
+      [
+        {
+          id: "strava:7001",
+          name: "First",
+          sport: "run",
+          distance: 500.5,
+          start: [40.123457, -105.123456],
+          end: [40.2, -105.3],
+          starred: true,
+          from: "strava",
+          created_from: null,
+        },
+        {
+          id: "strava:7002",
+          name: "Second",
+          sport: "ride",
+          distance: 500.5,
+          start: [40.123457, -105.123456],
+          end: [40.2, -105.3],
+          starred: false,
+          from: "strava",
+          created_from: null,
+        },
+        {
+          id: "strava:7005",
+          name: "effort name",
+          sport: null,
+          distance: null,
+          start: null,
+          end: null,
+          starred: false,
+          from: "strava",
+          created_from: null,
+        },
+      ],
+    );
+    const app = createHttpApp({
+      handler: { fetch: async () => new Response("x") } as never,
+      db,
+      snapshot: pub,
+      webhook: null,
+      allowedHosts: [],
+      mcpToken: "m",
+      snapshotToken: "s",
+      exporter: exp,
+      exportToken: "tok",
+      exportCorsOrigins: [],
+    });
+    const res = await app.request("http://localhost/export/canonical/v1/segments.json", {
+      headers: { authorization: "Bearer tok" },
+    });
+    assert.equal(res.status, 200);
+    assert.equal(res.headers.get("content-type"), "application/json");
+    assert.deepEqual(await res.json(), sj);
+  } finally {
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("the export route: disabled, unauthorized, served, and CORS only for listed origins", async () => {
   const dir = mkdtempSync(join(tmpdir(), "strava-canon-http-"));
   const db = await Database.open({ path: join(dir, "strava.duckdb"), snapshotDir: join(dir, "snapshot") });
