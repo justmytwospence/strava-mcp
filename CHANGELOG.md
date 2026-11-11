@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [4.9.0] - 2026-11-11
+
 ### Added
 
 - The canonical export carries segment efforts: each manifest entry has `segment_efforts` (visible efforts on the stream's clock, `[]` when none), and a new `segments.json` beside the manifest lists the segments they reference. It is served at `/export/canonical/v1/segments.json`.
@@ -178,7 +180,8 @@ A release for strangers: a self-contained Compose stack, a documentation site, a
 
 - Initial server over the Strava API: activities, athletes, segments, routes with GPX and TCX export, streams, clubs, gear, uploads; resources and prompts.
 
-[Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.8.1...HEAD
+[Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.9.0...HEAD
+[4.9.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.8.1...v4.9.0
 [4.8.1]: https://github.com/justmytwospence/strava-mcp/compare/v4.8.0...v4.8.1
 [4.8.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.7.0...v4.8.0
 [4.7.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.6.2...v4.7.0
