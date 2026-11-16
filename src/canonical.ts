@@ -29,8 +29,14 @@ import { type Candidate, fillWeather, type Track, type Weather, WeatherCache } f
 
 const SERVABLE = /^(manifest\.json|segments\.json|activities\/strava-\d+\.parquet)$/;
 
-export function sportFromStrava(type: string, name = ""): string {
-  switch (type.replace(/\s+/g, "").toLowerCase()) {
+/** A title that names a ski ergometer. */
+export const SKI_ERG = /\bski[\s-]?erg\b/i;
+
+export function sportFromStrava(type: string, name = "", opts: { trainer?: boolean } = {}): string {
+  const t = type.replace(/\s+/g, "").toLowerCase();
+  if (["nordicski", "workout", "rowing", "virtualrow"].includes(t) && SKI_ERG.test(name)) return "ski_erg";
+  if (t === "virtualrow" || (t === "rowing" && opts.trainer)) return "indoor_row";
+  switch (t) {
     case "run":
       return "run";
     case "trailrun":
@@ -70,8 +76,9 @@ export function sportFromStrava(type: string, name = ""): string {
 
 const FOOT = new Set(["run", "trail_run", "treadmill_run", "walk", "hike"]);
 const WHEEL = new Set(["ride", "gravel_ride", "mountain_bike", "indoor_ride", "virtual_ride"]);
+const ERG = new Set(["ski_erg", "indoor_row"]);
 export const cadenceUnit = (sport: string): string | null =>
-  FOOT.has(sport) ? "cycles" : WHEEL.has(sport) ? "rpm" : null;
+  FOOT.has(sport) ? "cycles" : WHEEL.has(sport) ? "rpm" : ERG.has(sport) ? "spm" : null;
 
 interface SegmentEffort {
   segment: string;
@@ -104,7 +111,8 @@ export function tagsOf(workoutType: unknown): string[] {
 
 const isIndoor = (a: Record<string, string | number | boolean | null>) => {
   const type = String(a.sport_type ?? a.type ?? "");
-  return Boolean(a.trainer) || type === "VirtualRide" || type === "VirtualRun";
+  const sport = sportFromStrava(type, String(a.name ?? ""), { trainer: Boolean(a.trainer) });
+  return Boolean(a.trainer) || type === "VirtualRide" || type === "VirtualRun" || ERG.has(sport);
 };
 
 export interface ExporterOptions {
@@ -289,7 +297,7 @@ export class CanonicalExporter {
       const id = String(a.id);
       const old = previous.get(`strava:${id}`);
       const type = String(a.sport_type ?? a.type ?? "");
-      const sport = sportFromStrava(type, String(a.name ?? ""));
+      const sport = sportFromStrava(type, String(a.name ?? ""), { trainer: Boolean(a.trainer) });
       return {
         id: `strava:${id}`,
         sources: [{ kind: "strava", id }],

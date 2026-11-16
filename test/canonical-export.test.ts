@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { DuckDBInstance } from "@duckdb/node-api";
-import { CanonicalExporter, type ExporterOptions, tagsOf } from "../src/canonical.js";
+import { CanonicalExporter, cadenceUnit, type ExporterOptions, sportFromStrava, tagsOf } from "../src/canonical.js";
 import { Database } from "../src/db/database.js";
 import { land } from "../src/db/raw.js";
 import { createHttpApp } from "../src/http.js";
@@ -32,6 +32,21 @@ function streams(n: number, withDup = false): string {
     watts: series(() => 200),
   });
 }
+
+test("ergometer sessions are classified from the type, the trainer flag and the title", () => {
+  const sport = (t: string, n: string, trainer = false) => sportFromStrava(t, n, { trainer });
+  assert.equal(sport("NordicSki", "SkiErg 6k"), "ski_erg");
+  assert.equal(sport("Workout", "SkiErg"), "ski_erg");
+  assert.equal(sport("Rowing", "Ski Erg"), "ski_erg");
+  assert.equal(sport("NordicSki", "Morning Nordic Ski"), "classic_ski");
+  assert.equal(sport("Rowing", "Row", true), "indoor_row");
+  assert.equal(sport("VirtualRow", "Row"), "indoor_row");
+  assert.equal(sport("Rowing", "Row"), "row");
+  assert.equal(sport("Workout", "Squat"), "other");
+  assert.equal(cadenceUnit("ski_erg"), "spm");
+  assert.equal(cadenceUnit("indoor_row"), "spm");
+  assert.equal(cadenceUnit("row"), null);
+});
 
 test("workout types become canonical tags", () => {
   assert.deepEqual(

@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Added
+
+- The canonical export knows ski ergometers and indoor rowing: sports `ski_erg` (a Strava NordicSki, Workout or Rowing titled SkiErg) and `indoor_row` (VirtualRow, or Rowing on a trainer), both indoor, with `cadence_unit` `spm`. Existing entries are reclassified on the next export without rewriting their recordings.
+
 ## [4.9.0] - 2026-11-11
 
 ### Added
