@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [4.10.0] - 2026-11-16
+
 ### Added
 
 - The canonical export knows ski ergometers and indoor rowing: sports `ski_erg` (a Strava NordicSki, Workout or Rowing titled SkiErg) and `indoor_row` (VirtualRow, or Rowing on a trainer), both indoor, with `cadence_unit` `spm`. Existing entries are reclassified on the next export without rewriting their recordings.
@@ -184,7 +186,8 @@ A release for strangers: a self-contained Compose stack, a documentation site, a
 
 - Initial server over the Strava API: activities, athletes, segments, routes with GPX and TCX export, streams, clubs, gear, uploads; resources and prompts.
 
-[Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.9.0...HEAD
+[Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.10.0...HEAD
+[4.10.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.9.0...v4.10.0
 [4.9.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.8.1...v4.9.0
 [4.8.1]: https://github.com/justmytwospence/strava-mcp/compare/v4.8.0...v4.8.1
 [4.8.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.7.0...v4.8.0
