@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [4.11.0] - 2026-11-21
+
 ### Changed
 
 - The canonical export files Strava's RollerSki as `skate_roller_ski` (or `classic_roller_ski` when the title says classic) instead of `other`, and a NordicSki is skate unless its title says classic (it was classic unless the title said skate); a title naming roller skis makes either the roller sport. Existing entries are reclassified on the next export.
@@ -191,6 +193,7 @@ A release for strangers: a self-contained Compose stack, a documentation site, a
 - Initial server over the Strava API: activities, athletes, segments, routes with GPX and TCX export, streams, clubs, gear, uploads; resources and prompts.
 
 [Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.10.0...HEAD
+[4.11.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.10.0...v4.11.0
 [4.10.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.9.0...v4.10.0
 [4.9.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.8.1...v4.9.0
 [4.8.1]: https://github.com/justmytwospence/strava-mcp/compare/v4.8.0...v4.8.1
