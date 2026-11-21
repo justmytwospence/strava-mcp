@@ -38,7 +38,11 @@ test("ergometer sessions are classified from the type, the trainer flag and the 
   assert.equal(sport("NordicSki", "SkiErg 6k"), "ski_erg");
   assert.equal(sport("Workout", "SkiErg"), "ski_erg");
   assert.equal(sport("Rowing", "Ski Erg"), "ski_erg");
-  assert.equal(sport("NordicSki", "Morning Nordic Ski"), "classic_ski");
+  assert.equal(sport("NordicSki", "Morning Nordic Ski"), "skate_ski");
+  assert.equal(sport("NordicSki", "Classic loop"), "classic_ski");
+  assert.equal(sport("RollerSki", "Morning Roller Ski"), "skate_roller_ski");
+  assert.equal(sport("RollerSki", "Classic rollerski"), "classic_roller_ski");
+  assert.equal(sport("NordicSki", "Rollerski intervals"), "skate_roller_ski");
   assert.equal(sport("Rowing", "Row", true), "indoor_row");
   assert.equal(sport("VirtualRow", "Row"), "indoor_row");
   assert.equal(sport("Rowing", "Row"), "row");

@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+
+- The canonical export files Strava's RollerSki as `skate_roller_ski` (or `classic_roller_ski` when the title says classic) instead of `other`, and a NordicSki is skate unless its title says classic (it was classic unless the title said skate); a title naming roller skis makes either the roller sport. Existing entries are reclassified on the next export.
+
 ## [4.10.0] - 2026-11-16
 
 ### Added
