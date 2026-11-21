@@ -32,6 +32,13 @@ const SERVABLE = /^(manifest\.json|segments\.json|activities\/strava-\d+\.parque
 /** A title that names a ski ergometer. */
 export const SKI_ERG = /\bski[\s-]?erg\b/i;
 
+/** A title that names roller skis. */
+export const ROLLER_SKI = /\broller[\s-]?ski/i;
+
+/** Nordic skiing is a technique on a surface: Strava gives the surface (NordicSki, RollerSki), the title the technique. */
+const nordic = (skate: boolean, roller: boolean): string =>
+  skate ? (roller ? "skate_roller_ski" : "skate_ski") : roller ? "classic_roller_ski" : "classic_ski";
+
 export function sportFromStrava(type: string, name = "", opts: { trainer?: boolean } = {}): string {
   const t = type.replace(/\s+/g, "").toLowerCase();
   if (["nordicski", "workout", "rowing", "virtualrow"].includes(t) && SKI_ERG.test(name)) return "ski_erg";
@@ -58,7 +65,9 @@ export function sportFromStrava(type: string, name = "", opts: { trainer?: boole
     case "backcountryski":
       return "backcountry_ski";
     case "nordicski":
-      return /skate/i.test(name) ? "skate_ski" : "classic_ski";
+      return nordic(!/classic/i.test(name), ROLLER_SKI.test(name));
+    case "rollerski":
+      return nordic(!/classic/i.test(name), true);
     case "alpineski":
       return "resort_ski";
     case "swim":
