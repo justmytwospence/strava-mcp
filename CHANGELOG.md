@@ -4,6 +4,8 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+## [4.12.0] - 2026-11-21
+
 ### Changed
 
 - A Nordic or roller ski's technique comes from the title only when it names exactly one: `skate` or `skating`, or `classic`, as whole words. A title naming both, or neither, is skate.
@@ -197,6 +199,7 @@ A release for strangers: a self-contained Compose stack, a documentation site, a
 - Initial server over the Strava API: activities, athletes, segments, routes with GPX and TCX export, streams, clubs, gear, uploads; resources and prompts.
 
 [Unreleased]: https://github.com/justmytwospence/strava-mcp/compare/v4.10.0...HEAD
+[4.12.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.11.0...v4.12.0
 [4.11.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.10.0...v4.11.0
 [4.10.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.9.0...v4.10.0
 [4.9.0]: https://github.com/justmytwospence/strava-mcp/compare/v4.8.1...v4.9.0
