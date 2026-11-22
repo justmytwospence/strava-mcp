@@ -4,6 +4,10 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+
+- A Nordic or roller ski's technique comes from the title only when it names exactly one: `skate` or `skating`, or `classic`, as whole words. A title naming both, or neither, is skate.
+
 ## [4.11.0] - 2026-11-21
 
 ### Changed

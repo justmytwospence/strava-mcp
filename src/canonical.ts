@@ -39,6 +39,17 @@ export const ROLLER_SKI = /\broller[\s-]?ski/i;
 const nordic = (skate: boolean, roller: boolean): string =>
   skate ? (roller ? "skate_roller_ski" : "skate_ski") : roller ? "classic_roller_ski" : "classic_ski";
 
+/**
+ * The technique a title names (curves' SPEC, Nordic skiing): skate for `skate` or `skating` without `classic`, classic
+ * for `classic` alone (whole words, any case), else none. Garmin's own titles count too: Strava copies them from
+ * Garmin Connect, and they name the type the watch recorded.
+ */
+export function titleSkate(name: string): boolean | null {
+  const skate = /\bskat(e|ing)\b/i.test(name);
+  const classic = /\bclassic\b/i.test(name);
+  return skate === classic ? null : skate;
+}
+
 export function sportFromStrava(type: string, name = "", opts: { trainer?: boolean } = {}): string {
   const t = type.replace(/\s+/g, "").toLowerCase();
   if (["nordicski", "workout", "rowing", "virtualrow"].includes(t) && SKI_ERG.test(name)) return "ski_erg";
@@ -65,9 +76,9 @@ export function sportFromStrava(type: string, name = "", opts: { trainer?: boole
     case "backcountryski":
       return "backcountry_ski";
     case "nordicski":
-      return nordic(!/classic/i.test(name), ROLLER_SKI.test(name));
+      return nordic(titleSkate(name) ?? true, ROLLER_SKI.test(name));
     case "rollerski":
-      return nordic(!/classic/i.test(name), true);
+      return nordic(titleSkate(name) ?? true, true);
     case "alpineski":
       return "resort_ski";
     case "swim":
